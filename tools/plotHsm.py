@@ -1,17 +1,14 @@
+#!/usr/bin/python3
 # Author: Antonio Maiorano (amaiorano@gmail.com)
 
 import os
 import sys
 import tempfile
 import platform
+from functools import reduce
 
 def PrintUsage():
-	print """
-Plots an HSM defined in cpp file(s) via hsmToDot -> dot -> default image viewer
-Requires GraphViz (Windows: https://graphviz.gitlab.io/_pages/Download/Download_windows.html)
-
-Usage: {} <filespec>
-	""".format(os.path.basename(sys.argv[0]))
+	print ("Plots an HSM defined in cpp file(s) via hsmToDot -> dot -> default image viewer\nRequires GraphViz (Windows: https://graphviz.gitlab.io/_pages/Download/Download_windows.html)\nUsage: {} <filespec>\n".format(os.path.basename(sys.argv[0])))
 	
 def GetScriptPath():
     return os.path.dirname(os.path.realpath(sys.argv[0]))
@@ -43,7 +40,7 @@ def main(argv = None):
 		
 	# Write dot file
 	dotFile = os.path.join(tempfile.gettempdir(), os.path.basename(filespec) + '.dot')
-	ExecCommand('"{}" {}'.format(sys.executable, os.path.join(GetScriptPath(), 'hsmToDot.py') + ' ' + filespec + ' > ' + dotFile))
+	ExecCommand('"{}" {}'.format(sys.executable, os.path.join(GetScriptPath(), 'hsmToDot.py') + ' ' + filespec + ' ' + argv[2] +' > ' + dotFile))
 	
 	# Invoke dot to produce image
 	pngFile = dotFile + '.png'

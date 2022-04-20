@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 # Author: Frederic Hamel (fhamel@gmail.com)
 
 import os
@@ -5,13 +7,10 @@ import sys
 import re
 import pprint
 import binascii
+from functools import reduce
 
 def PrintUsage():
-	print """
-Parses cpp file(s) containing an HSM and outputs dot format text that can be used to render it.
-	
-Usage: {} <filespec>
-	""".format(os.path.basename(sys.argv[0]))
+		print("Parses cpp file(s) containing an HSM and outputs dot format text that can be used to render it.\nUsage: {} <filespec>\n".format(os.path.basename(sys.argv[0])))
 
 DOT_LEFT_RIGHT = False
 DOT_USE_COLOR = True
@@ -25,6 +24,7 @@ INNER_TRANSITION_RE = re.compile("InnerTransition\s*<\s*([^\s]*?)\s*>\s*\(", re.
 INNER_ENTRY_TRANSITION_RE = re.compile("InnerEntryTransition\s*<\s*([^\s]*?)\s*>\s*\(", re.IGNORECASE)
 SIBLING_TRANSITION_RE = re.compile("SiblingTransition\s*<\s*([^\s]*?)\s*>\s*\(", re.IGNORECASE)
 TYPEDEFS_RE = re.compile("typedef.*\s+(?P<statename>\w+)\s+(?P<alias>\w+)\s*;", re.IGNORECASE)
+KNOWN_STATE_RE = re.compile("::(?P<statename>\w+)::GetTransition()", re.IGNORECASE)
 
 TAG_REUSABLE_STATE = "@PLOTHSM_REUSABLE"
 IGNORED_STATE_NAMES = ["Args"]
@@ -92,13 +92,13 @@ class State:
 		#Info("New state: %s" % self)
 	
 	def Inners(self, mustBeLegal = True):
-		return filter(lambda x: (x.Type == INNER_TRANSITION) and (x.IsLegal or not mustBeLegal), self._transitions)
+		return list(filter(lambda x: (x.Type == INNER_TRANSITION) and (x.IsLegal or not mustBeLegal), self._transitions))
 
 	def InnerEntries(self, mustBeLegal = True):
-		return filter(lambda x: (x.Type == INNER_ENTRY_TRANSITION) and (x.IsLegal or not mustBeLegal), self._transitions)
+		return list(filter(lambda x: (x.Type == INNER_ENTRY_TRANSITION) and (x.IsLegal or not mustBeLegal), self._transitions))
 
 	def Siblings(self, mustBeLegal = True):
-		return filter(lambda x: (x.Type == SIBLING_TRANSITION) and (x.IsLegal or not mustBeLegal), self._transitions)
+		return list(filter(lambda x: (x.Type == SIBLING_TRANSITION) and (x.IsLegal or not mustBeLegal), self._transitions))
 		
 	def SiblingStates(self, mustBeLegal = True):
 		return [t.TargetState for t in self.Siblings(mustBeLegal)]
@@ -243,13 +243,13 @@ class Hsm:
 			goOn = True
 
 		if goOn:
-			for t in state.Siblings():
-				self._AssignParentsAndChildrenForState(t.TargetState, statesOnStack)
-			statesOnStack.append(state)
-			for t in state.Inners() + state.InnerEntries():
-				self._AssignParentsAndChildrenForState(t.TargetState, statesOnStack)
-			statesOnStack.remove(state)
-		   
+				for t in state.Siblings():
+						self._AssignParentsAndChildrenForState(t.TargetState, statesOnStack)
+				statesOnStack.append(state)
+				for t in state.Inners() + state.InnerEntries():
+						self._AssignParentsAndChildrenForState(t.TargetState, statesOnStack)
+				statesOnStack.remove(state)
+		                
 	def _AssignParentsAndChildrenForRoots(self):
 		for root in self.GetRoots():
 			self._AssignParentsAndChildrenForState(root)
@@ -327,8 +327,8 @@ class Hsm:
 			state.Clusters = clustersFromParent
 			# Possibly add a new cluster if our name starts with our parents'
 			if state.Name.startswith(curParent.Name) and not curParent.Name in state.Clusters:
-				state.Clusters.append(curParent.Name)
-				curParent.Clusters.append(curParent.Name)
+					state.Clusters.append(curParent.Name)
+					curParent.Clusters.append(curParent.Name)
 
 	def _AssignClusters(self):
 		self.VisitAllStatesOnceDepthFirst(self._AssignClusterForState)
@@ -339,16 +339,16 @@ class Hsm:
 				if s in roots:
 					roots.remove(s)
 					_RemoveSiblings(s, roots)
-			if state in roots:
+			if state in roots: 
 				roots.remove(state)
 
 		# Assume all states are roots, then remove any state that has an inner transition to it, and
 		# all of its siblings. This will leave real root states and base states.
-		roots = self._states.values()
+		roots = list(self._states.values())
 		for state in self._states.values():
 			for transition in state.Transitions():
 				if transition.TargetState in roots and transition.Type in [INNER_TRANSITION, INNER_ENTRY_TRANSITION]:
-					#Info(">>> Removing {} and its siblings because a state inners to it".format(transition.TargetState.Name))
+					Info(">>> Removing {} and its siblings because a state inners to it".format(transition.TargetState.Name))
 					_RemoveSiblings(transition.TargetState, roots)
 
 		# Mark non-base states as real roots
@@ -370,7 +370,7 @@ class Hsm:
 				s.IsRoot = False
 	
 	def GetRoots(self):
-		return filter(lambda x: x.IsRoot, self._states.values())
+		return list(filter(lambda x: x.IsRoot, self._states.values()))
 
 	def GetAllReachableStatesFromState(self, state):
 		states = []
@@ -438,21 +438,21 @@ class Hsm:
 		self._AssignClusters()
 				   
 	def GetStateByName(self, name):
-		if self._states.has_key(name):
+		if name in self._states:
 			return self._states[name]
 		else:
 			return None
 
 	def GetStateByNameOrAlias(self, name):
-		if self._states.has_key(name):
+		if name in self._states:
 			return self._states[name]
-		elif self._aliases.has_key(name) and self._states.has_key(self._aliases[name]):
+		elif name in self._aliases and self._aliases[name] in self._states:
 			return self._states[self._aliases[name]]
 		else:
 			return None
 			
 	def GetStatesByRank(self, rank):
-		return filter(lambda x: x.Rank == rank, self._states.values())
+                return filter(lambda x: x.Rank == rank, self._states.values())
 
 	def GetMaxRank(self):
 		return reduce(lambda x, y: max(x, y), (x.Rank for x in self._states.values()))
@@ -502,6 +502,12 @@ def ParseHsm(filespec, hsm):
 				if fullLine.find(TAG_REUSABLE_STATE) != -1:
 					curState.IsReusable = True
 
+		m = KNOWN_STATE_RE.search(lineNoComments)
+		if m != None:
+			stateName = m.group('statename')
+			if hsm.GetStateByName(stateName) != None:
+				curState = hsm.GetStateByName(stateName)
+
 		if curState != None:
 			m = INNER_TRANSITION_RE.search(lineNoComments)
 			if m != None:
@@ -536,8 +542,8 @@ def GetAttributesForState(hsm, state):
 
 	if DOT_USE_COLOR:
 		# We select a unique hue per cluster
-		clusterHash = binascii.crc32("".join(state.Clusters)) & 0xffffffff
-		H = float((clusterHash + sys.maxint/4) % sys.maxint) / sys.maxint
+		clusterHash = binascii.crc32("".join(state.Clusters).encode()) & 0xffffffff
+		H = float((clusterHash + sys.maxsize/4) % sys.maxsize) / sys.maxsize
 
 		S = 0.5
 
@@ -629,7 +635,7 @@ def BuildClusterMap(hsm):
 			
 			childCluster = state.Clusters[i]
 			
-			if not clusterMap.has_key(childCluster):
+			if not childCluster in clusterMap:
 				clusterMap[childCluster] = ClusterMapElement()
 			
 			if not childCluster in clusterMap[parentCluster].SubClusters:
