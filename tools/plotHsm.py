@@ -22,7 +22,7 @@ def ExecCommand(command):
 def OpenImage(command):
 	curr_platform = platform.system()
 	if curr_platform == 'Linux':
-		ExecCommand('xdg-open ' + command)
+		ExecCommand('eog ' + command)
 	elif curr_platform == 'Windows':
 		ExecCommand(command)
 	else:

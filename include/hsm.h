@@ -315,30 +315,24 @@ struct Transition
 
 	// Default is no transition
 	Transition()
-		: mTransitionType(Transition::No)
-		, mStateFactory(0)
+	: mTransitionType(Transition::No)
+	, mStateFactory(0)
+	, mLabel("")
 	{
 	}
 
 	// Transition without state args
-	Transition(Transition::Type transitionType, const StateFactory& stateFactory)
-		: mTransitionType(transitionType)
-		, mStateFactory(&stateFactory)
-	{
-	}
-
-	// Transition with state args
-	Transition(Transition::Type transitionType, const StateFactory& stateFactory, OnEnterArgsFunc onEnterArgsFunc)
-		: mTransitionType(transitionType)
-		, mStateFactory(&stateFactory)
-		, mOnEnterArgsFunc(std::move(onEnterArgsFunc))
+	Transition(Transition::Type transitionType, const StateFactory& stateFactory, std::string label)
+	: mTransitionType(transitionType)
+	, mStateFactory(&stateFactory)
+	, mLabel(label)
 	{
 	}
 
 	Transition::Type GetTransitionType() const { return mTransitionType; }
 	StateTypeId GetTargetStateType() const { HSM_ASSERT(mStateFactory != 0); return mStateFactory->GetStateType(); }
 	const StateFactory& GetStateFactory() const { HSM_ASSERT(mStateFactory != 0); return *mStateFactory; }
-	const OnEnterArgsFunc& GetOnEnterArgsFunc() const { return mOnEnterArgsFunc; }
+	std::string getLabel(){return mLabel;};
 
 	hsm_bool IsSibling() const { return mTransitionType == Sibling; }
 	hsm_bool IsInner() const { return mTransitionType == Inner; }
@@ -348,7 +342,7 @@ struct Transition
 private:
 	Transition::Type mTransitionType;
 	const StateFactory* mStateFactory; // Bald pointer is safe for shallow copying because StateFactory instances are always statically allocated
-	OnEnterArgsFunc mOnEnterArgsFunc; // Optional: set if transition specifies arguments
+	std::string mLabel;
 };
 
 
@@ -356,74 +350,42 @@ private:
 
 // SiblingTransition
 
-inline Transition SiblingTransition(const StateFactory& stateFactory)
+inline Transition SiblingTransition(const StateFactory& stateFactory, std::string label)
 {
-	return Transition(Transition::Sibling, stateFactory);
+	return Transition(Transition::Sibling, stateFactory, label);
 }
 
 template <typename TargetState>
-Transition SiblingTransition()
+Transition SiblingTransition(std::string label)
 {
-	return Transition(Transition::Sibling, GetStateFactory<TargetState>());
+	return Transition(Transition::Sibling, GetStateFactory<TargetState>(), label);
 }
-
-template <typename TargetState, typename... Args>
-Transition SiblingTransition(Args&&... args)
-{
-	return Transition(Transition::Sibling, GetStateFactory<TargetState>(), detail::GenerateOnEnterArgsFunc<TargetState>(std::forward<Args>(args)...));
-}
-
-// Deprecated after v1.5 upon realizing that it's not possible to bind to the correct OnEnter for state
-// overrides since the actual target state is not known at compile time, but rather at runtime.
-template <typename TargetState, typename T1, typename... Args>
-HSM_DEPRECATED("Passing state args to state overrides is not supported")
-Transition SiblingTransition(const StateOverride<TargetState>& stateOverride, T1&& arg1, Args&&... args);
 
 // InnerTransition
 
-inline Transition InnerTransition(const StateFactory& stateFactory)
+inline Transition InnerTransition(const StateFactory& stateFactory, std::string label)
 {
-	return Transition(Transition::Inner, stateFactory);
+	return Transition(Transition::Inner, stateFactory, label);
 }
 
 template <typename TargetState>
-Transition InnerTransition()
+Transition InnerTransition(std::string label)
 {
-	return Transition(Transition::Inner, GetStateFactory<TargetState>());
+	return Transition(Transition::Inner, GetStateFactory<TargetState>(), label);
 }
-
-template <typename TargetState, typename... Args>
-Transition InnerTransition(Args&&... args)
-{
-	return Transition(Transition::Inner, GetStateFactory<TargetState>(), detail::GenerateOnEnterArgsFunc<TargetState>(std::forward<Args>(args)...));
-}
-
-template <typename TargetState, typename T1, typename... Args>
-HSM_DEPRECATED("Passing state args to state overrides is not supported") // See details on SiblingTransition version
-Transition InnerTransition(const StateOverride<TargetState>& stateOverride, T1&& arg1, Args&&... args);
 
 // InnerEntryTransition
 
-inline Transition InnerEntryTransition(const StateFactory& stateFactory)
+inline Transition InnerEntryTransition(const StateFactory& stateFactory, std::string label)
 {
-	return Transition(Transition::InnerEntry, stateFactory);
+	return Transition(Transition::InnerEntry, stateFactory, label);
 }
 
 template <typename TargetState>
-Transition InnerEntryTransition()
+Transition InnerEntryTransition(std::string label)
 {
-	return Transition(Transition::InnerEntry, GetStateFactory<TargetState>());
+	return Transition(Transition::InnerEntry, GetStateFactory<TargetState>(), label);
 }
-
-template <typename TargetState, typename... Args>
-Transition InnerEntryTransition(Args&&... args)
-{
-	return Transition(Transition::InnerEntry, GetStateFactory<TargetState>(), detail::GenerateOnEnterArgsFunc<TargetState>(std::forward<Args>(args)...));
-}
-
-template <typename TargetState, typename T1, typename... Args>
-HSM_DEPRECATED("Passing state args to state overrides is not supported") // See details on SiblingTransition version
-Transition InnerEntryTransition(const StateOverride<TargetState>& stateOverride, T1&& arg1, Args&&... args);
 
 // NoTransition
 
@@ -808,7 +770,7 @@ public:
 	void Initialize(Owner* owner = 0)
 	{
 		HSM_ASSERT(mInitialTransition.IsNo());
-		mInitialTransition = SiblingTransition(GetStateFactory<InitialStateType>());
+		mInitialTransition = SiblingTransition(GetStateFactory<InitialStateType>(), std::string("Initialize"));
 		mOwner = owner;
 	}
 
@@ -1078,14 +1040,7 @@ namespace detail
 
 	inline void InvokeStateOnEnter(const Transition& transition, State* state)
 	{
-		if (const auto& onEnterArgsFunc = transition.GetOnEnterArgsFunc())
-		{
-			onEnterArgsFunc(state);
-		}
-		else
-		{
-			state->OnEnter();
-		}
+		state->OnEnter();
 	}
 
 	inline void InvokeStateOnExit(State* state)
