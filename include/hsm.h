@@ -1271,6 +1271,9 @@ inline std::vector<const hsm_char *> StateMachine::PopStatesToDepth(size_t depth
 		PopState();
 		detail::DestroyState(state);
 	}
+	if(numStatesToPop>1)
+		HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("note over %s,%s \"Hierarchical State Destroyed\"\n"), popNames.front(), popNames.back());
+
 	return popNames;
 }
 
