@@ -1,0 +1,1 @@
+/usr/bin/c++  -std=c++14 -rdynamic CMakeFiles/ch4_parallel_state_machines.dir/source/ch4/parallel_state_machines.cpp.o -o ch4_parallel_state_machines 

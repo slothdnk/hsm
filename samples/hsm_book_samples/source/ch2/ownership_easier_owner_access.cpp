@@ -1,106 +1,76 @@
 // ownership_easier_owner_access.cpp
 
-#include <cstdio>
 #include "hsm.h"
+#include <cstdio>
 using namespace hsm;
 
-class MyOwner
-{
+class MyOwner {
 public:
-	MyOwner();
-	void UpdateStateMachine();
-	void PlaySequence();
-	bool GetPlaySequence() const;
+  MyOwner();
+  void UpdateStateMachine();
+  void PlaySequence();
+  bool GetPlaySequence() const;
 
 private:
-	StateMachine mStateMachine;
-	bool mPlaySequence;
+  StateMachine mStateMachine;
+  bool mPlaySequence;
 };
 
-struct MyStates
-{
-	struct BaseState : StateWithOwner<MyOwner>
-	{
-	};
+struct MyStates {
+  struct BaseState : StateWithOwner<MyOwner> {};
 
-	struct First : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().GetPlaySequence())
-				return SiblingTransition<Second>();
+  struct First : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().GetPlaySequence())
+        return SiblingTransition<Second>("Second");
 
-			return NoTransition();
-		}
+      return NoTransition();
+    }
 
-		virtual void Update()
-		{
-			printf("First::Update\n");
-		}
-	};
+    virtual void Update() { printf("First::Update\n"); }
+  };
 
-	struct Second : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().GetPlaySequence())
-				return SiblingTransition<Third>();
+  struct Second : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().GetPlaySequence())
+        return SiblingTransition<Third>("Third");
 
-			return NoTransition();
-		}
+      return NoTransition();
+    }
 
-		virtual void Update()
-		{
-			printf("Second::Update\n");
-		}
-	};
+    virtual void Update() { printf("Second::Update\n"); }
+  };
 
-	struct Third : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return NoTransition();
-		}
+  struct Third : BaseState {
+    virtual Transition GetTransition() { return NoTransition(); }
 
-		virtual void Update()
-		{
-			printf("Third::Update\n");
-		}
-	};
+    virtual void Update() { printf("Third::Update\n"); }
+  };
 };
 
-MyOwner::MyOwner()
-{
-	mPlaySequence = false;
-	mStateMachine.Initialize<MyStates::First>(this);
-	mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
+MyOwner::MyOwner() {
+  mPlaySequence = false;
+  mStateMachine.Initialize<MyStates::First>(this);
+  mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
 }
 
-void MyOwner::UpdateStateMachine()
-{
-	mStateMachine.ProcessStateTransitions();
-	mStateMachine.UpdateStates();
+void MyOwner::UpdateStateMachine() {
+  mStateMachine.ProcessStateTransitions();
+  mStateMachine.UpdateStates();
 }
 
-void MyOwner::PlaySequence()
-{
-	mPlaySequence = true;
-}
+void MyOwner::PlaySequence() { mPlaySequence = true; }
 
-bool MyOwner::GetPlaySequence() const
-{
-	return mPlaySequence;
-}
+bool MyOwner::GetPlaySequence() const { return mPlaySequence; }
 
-int main()
-{
-	MyOwner myOwner;
+int main() {
+  MyOwner myOwner;
 
-	myOwner.UpdateStateMachine();
-	myOwner.UpdateStateMachine();
+  myOwner.UpdateStateMachine();
+  myOwner.UpdateStateMachine();
 
-	myOwner.PlaySequence();
+  myOwner.PlaySequence();
 
-	myOwner.UpdateStateMachine();
-	myOwner.UpdateStateMachine();
+  myOwner.UpdateStateMachine();
+  myOwner.UpdateStateMachine();
 }

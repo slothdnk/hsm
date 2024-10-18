@@ -4,117 +4,94 @@
 
 using namespace hsm;
 
-class Character
-{
+class Character {
 public:
-	Character();
-	void Update();
+  Character();
+  void Update();
 
-	bool mJump;
+  bool mJump;
 
 private:
-	friend struct CharacterStates;
-	StateMachine mStateMachine;
+  friend struct CharacterStates;
+  StateMachine mStateMachine;
 };
 
-struct CharacterStates
-{
-	struct BaseState : StateWithOwner<Character>
-	{
-	};
+struct CharacterStates {
+  struct BaseState : StateWithOwner<Character> {};
 
-	struct Alive : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return InnerEntryTransition<Stand>();
-		}
-	};
+  struct Alive : BaseState {
+    virtual Transition GetTransition() {
+      return InnerEntryTransition<Stand>("Stand");
+    }
+  };
 
-	struct Stand : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().mJump)
-			{
-				Owner().mJump = false;
-				return SiblingTransition<Jump>();
-			}
-			
-			return NoTransition();
-		}
-	};
+  struct Stand : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().mJump) {
+        Owner().mJump = false;
+        return SiblingTransition<Jump>("Jump");
+      }
 
-	struct Jump : BaseState
-	{
-		int mJumpValue1;
-		float mJumpValue2;
-		bool mJumpValue3;
+      return NoTransition();
+    }
+  };
 
-		Jump() : mJumpValue1(0), mJumpValue2(0.0f), mJumpValue3(false) { }
+  struct Jump : BaseState {
+    int mJumpValue1;
+    float mJumpValue2;
+    bool mJumpValue3;
 
-		virtual Transition GetTransition()
-		{
-			if (IsInInnerState<Jump_Done>())
-				return SiblingTransition<Stand>();
+    Jump() : mJumpValue1(0), mJumpValue2(0.0f), mJumpValue3(false) {}
 
-			return InnerEntryTransition<Jump_Up>();
-		}
-	};
+    virtual Transition GetTransition() {
+      if (IsInInnerState<Jump_Done>())
+        return SiblingTransition<Stand>("Stand");
 
-	struct Jump_Up : BaseState
-	{
-		virtual void OnEnter()
-		{
-			GetOuterState<Jump>()->mJumpValue1 = 1;
-			GetOuterState<Jump>()->mJumpValue2 = 2.0f;
-			GetOuterState<Jump>()->mJumpValue3 = true;
-		}
+      return InnerEntryTransition<Jump_Up>("Jump_Up");
+    }
+  };
 
-		virtual Transition GetTransition()
-		{
-			return SiblingTransition<Jump_Down>();
-		}
-	};
+  struct Jump_Up : BaseState {
+    virtual void OnEnter() {
+      GetOuterState<Jump>()->mJumpValue1 = 1;
+      GetOuterState<Jump>()->mJumpValue2 = 2.0f;
+      GetOuterState<Jump>()->mJumpValue3 = true;
+    }
 
-	struct Jump_Down : BaseState
-	{
-		virtual void OnEnter()
-		{
-			GetOuterState<Jump>()->mJumpValue1 = 2;
-			GetOuterState<Jump>()->mJumpValue2 = 4.0f;
-			GetOuterState<Jump>()->mJumpValue3 = false;
-		}
+    virtual Transition GetTransition() {
+      return SiblingTransition<Jump_Down>("Jump_Down");
+    }
+  };
 
-		virtual Transition GetTransition()
-		{
-			return SiblingTransition<Jump_Done>();
-		}
-	};
+  struct Jump_Down : BaseState {
+    virtual void OnEnter() {
+      GetOuterState<Jump>()->mJumpValue1 = 2;
+      GetOuterState<Jump>()->mJumpValue2 = 4.0f;
+      GetOuterState<Jump>()->mJumpValue3 = false;
+    }
 
-	struct Jump_Done : BaseState
-	{
-	};
+    virtual Transition GetTransition() {
+      return SiblingTransition<Jump_Done>("Jump_Done");
+    }
+  };
+
+  struct Jump_Done : BaseState {};
 };
 
-Character::Character()
-	: mJump(false)
-{
-	mStateMachine.Initialize<CharacterStates::Alive>(this);
-	mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
+Character::Character() : mJump(false) {
+  mStateMachine.Initialize<CharacterStates::Alive>(this);
+  mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
 }
 
-void Character::Update()
-{
-	// Update state machine
-	mStateMachine.ProcessStateTransitions();
-	mStateMachine.UpdateStates();
+void Character::Update() {
+  // Update state machine
+  mStateMachine.ProcessStateTransitions();
+  mStateMachine.UpdateStates();
 }
 
-int main()
-{
-	Character character;
-	character.Update();
-	character.mJump = true;
-	character.Update();
+int main() {
+  Character character;
+  character.Update();
+  character.mJump = true;
+  character.Update();
 }

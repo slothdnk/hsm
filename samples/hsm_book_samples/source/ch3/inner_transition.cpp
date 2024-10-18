@@ -4,95 +4,74 @@
 
 using namespace hsm;
 
-class MyOwner
-{
+class MyOwner {
 public:
-	MyOwner();
-	void UpdateStateMachine();
+  MyOwner();
+  void UpdateStateMachine();
 
-	void Die() { mDead = true; }
-	void SetMove(bool enable) { mMove = enable; }
+  void Die() { mDead = true; }
+  void SetMove(bool enable) { mMove = enable; }
 
 private:
-	bool IsDead() const { return mDead; }
-	bool PressedMove() const { return mMove; }
+  bool IsDead() const { return mDead; }
+  bool PressedMove() const { return mMove; }
 
-	bool mDead;
-	bool mMove;
+  bool mDead;
+  bool mMove;
 
-	friend struct MyStates;
-	StateMachine mStateMachine;
+  friend struct MyStates;
+  StateMachine mStateMachine;
 };
 
-struct MyStates
-{
-	struct BaseState : StateWithOwner<MyOwner>
-	{
-	};
+struct MyStates {
+  struct BaseState : StateWithOwner<MyOwner> {};
 
-	struct Alive : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().IsDead())
-				return SiblingTransition<Dead>();
+  struct Alive : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().IsDead())
+        return SiblingTransition<Dead>("Dead");
 
-			return InnerEntryTransition<Locomotion>();
-		}
-	};
+      return InnerEntryTransition<Locomotion>("Locomotion");
+    }
+  };
 
-	struct Dead : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return NoTransition();
-		}
-	};
+  struct Dead : BaseState {
+    virtual Transition GetTransition() { return NoTransition(); }
+  };
 
-	struct Locomotion : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().PressedMove())
-				return InnerTransition<Move>();
-			else
-				return InnerTransition<Stand>();
-		}
-	};
+  struct Locomotion : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().PressedMove())
+        return InnerTransition<Move>("Move");
+      else
+        return InnerTransition<Stand>("Stand");
+    }
+  };
 
-	struct Stand : BaseState
-	{
-	};
+  struct Stand : BaseState {};
 
-	struct Move : BaseState
-	{
-	};
+  struct Move : BaseState {};
 };
 
-MyOwner::MyOwner()
-	: mDead(false)
-	, mMove(false)
-{
-	mStateMachine.Initialize<MyStates::Alive>(this);
-	mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
+MyOwner::MyOwner() : mDead(false), mMove(false) {
+  mStateMachine.Initialize<MyStates::Alive>(this);
+  mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
 }
 
-void MyOwner::UpdateStateMachine()
-{
-	mStateMachine.ProcessStateTransitions();
-	mStateMachine.UpdateStates();
+void MyOwner::UpdateStateMachine() {
+  mStateMachine.ProcessStateTransitions();
+  mStateMachine.UpdateStates();
 }
 
-int main()
-{
-	MyOwner myOwner;
-	myOwner.UpdateStateMachine();
+int main() {
+  MyOwner myOwner;
+  myOwner.UpdateStateMachine();
 
-	printf("Set Move = true\n");
-	myOwner.SetMove(true);
-	myOwner.UpdateStateMachine();
+  printf("Set Move = true\n");
+  myOwner.SetMove(true);
+  myOwner.UpdateStateMachine();
 
-	printf("Set Move = false\n");
-	myOwner.SetMove(false);
-	myOwner.UpdateStateMachine();
+  printf("Set Move = false\n");
+  myOwner.SetMove(false);
+  myOwner.UpdateStateMachine();
 }

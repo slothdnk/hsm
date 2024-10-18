@@ -4,140 +4,115 @@
 
 using namespace hsm;
 
-class Character
-{
+class Character {
 public:
-	Character();
-	void Update();
+  Character();
+  void Update();
 
-	// Public to simplify sample
-	bool mCrouchInputPressed;
+  // Public to simplify sample
+  bool mCrouchInputPressed;
 
 private:
-	friend struct CharacterStates;
-	StateMachine mStateMachine;
+  friend struct CharacterStates;
+  StateMachine mStateMachine;
 };
 
-struct CharacterStates
-{
-	struct BaseState : StateWithOwner<Character>
-	{
-	};
+struct CharacterStates {
+  struct BaseState : StateWithOwner<Character> {};
 
-	struct Alive : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return InnerEntryTransition<Stand>();
-		}
-	};
+  struct Alive : BaseState {
+    virtual Transition GetTransition() {
+      return InnerEntryTransition<Stand>("Stand");
+    }
+  };
 
-
-// Uncomment this macro to compile the "broken version" of this sample.
-// The problem is that it results in an infinite loop between the two states.
-// The non-broken version works by deferring the transition to the next "frame".
-//#define BROKEN_VERSION
+  // Uncomment this macro to compile the "broken version" of this sample.
+  // The problem is that it results in an infinite loop between the two states.
+  // The non-broken version works by deferring the transition to the next
+  // "frame".
+  // #define BROKEN_VERSION
 
 #ifdef BROKEN_VERSION
 
-	struct Stand : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().mCrouchInputPressed)
-			{
-				return SiblingTransition<Crouch>();
-			}
+  struct Stand : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().mCrouchInputPressed) {
+        return SiblingTransition<Crouch>("Crouch");
+      }
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Crouch : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().mCrouchInputPressed)
-				return SiblingTransition<Stand>();
+  struct Crouch : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().mCrouchInputPressed)
+        return SiblingTransition<Stand>("Stand");
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
 #else
 
-	struct Stand : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return mTransition;
-		}
+  struct Stand : BaseState {
+    virtual Transition GetTransition() { return mTransition; }
 
-		virtual void Update()
-		{
-			if (Owner().mCrouchInputPressed)
-				mTransition = SiblingTransition<Crouch>();
-		}
+    virtual void Update() {
+      if (Owner().mCrouchInputPressed)
+        mTransition = SiblingTransition<Crouch>("Crouch");
+    }
 
-		Transition mTransition;
-	};
+    Transition mTransition;
+  };
 
-	struct Crouch : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return mTransition;
-		}
+  struct Crouch : BaseState {
+    virtual Transition GetTransition() { return mTransition; }
 
-		virtual void Update()
-		{
-			if (Owner().mCrouchInputPressed)
-				mTransition = SiblingTransition<Stand>();
-		}
+    virtual void Update() {
+      if (Owner().mCrouchInputPressed)
+        mTransition = SiblingTransition<Stand>("Stand");
+    }
 
-		Transition mTransition;
-	};
+    Transition mTransition;
+  };
 #endif
 };
 
-Character::Character()
-	: mCrouchInputPressed(false)
-{
-	mStateMachine.Initialize<CharacterStates::Alive>(this);
-	mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
+Character::Character() : mCrouchInputPressed(false) {
+  mStateMachine.Initialize<CharacterStates::Alive>(this);
+  mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
 }
 
-void Character::Update()
-{
-	// Update state machine
-	mStateMachine.ProcessStateTransitions();
-	mStateMachine.UpdateStates();
+void Character::Update() {
+  // Update state machine
+  mStateMachine.ProcessStateTransitions();
+  mStateMachine.UpdateStates();
 }
 
-int main()
-{
-	Character character;
+int main() {
+  Character character;
 
-	character.Update();
+  character.Update();
 
-	printf(">>> Crouch!\n");
-	character.mCrouchInputPressed = true;
-	character.Update();
-	character.Update();
-	character.Update();
-	character.Update();
-	character.mCrouchInputPressed = false;
-	character.Update();
+  printf(">>> Crouch!\n");
+  character.mCrouchInputPressed = true;
+  character.Update();
+  character.Update();
+  character.Update();
+  character.Update();
+  character.mCrouchInputPressed = false;
+  character.Update();
 
-	printf(">>> Stand!\n");
-	character.mCrouchInputPressed = true;
-	character.Update();
-	character.mCrouchInputPressed = false;
-	character.Update();
+  printf(">>> Stand!\n");
+  character.mCrouchInputPressed = true;
+  character.Update();
+  character.mCrouchInputPressed = false;
+  character.Update();
 
-	printf(">>> Crouch!\n");
-	character.mCrouchInputPressed = true;
-	character.Update();
-	character.mCrouchInputPressed = false;
-	character.Update();
+  printf(">>> Crouch!\n");
+  character.mCrouchInputPressed = true;
+  character.Update();
+  character.mCrouchInputPressed = false;
+  character.Update();
 }

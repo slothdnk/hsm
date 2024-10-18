@@ -4,145 +4,120 @@
 
 using namespace hsm;
 
-class MyOwner
-{
+class MyOwner {
 public:
-	MyOwner();
-	void UpdateStateMachine();
+  MyOwner();
+  void UpdateStateMachine();
 
 private:
-	bool IsDead() const { return false; }
-	bool PressedJump() const { return false; }
-	bool PressedShoot() const { return false; }
-	bool PressedMove() const { return false; }
-	bool PressedCrouch() const { return false; }
+  bool IsDead() const { return false; }
+  bool PressedJump() const { return false; }
+  bool PressedShoot() const { return false; }
+  bool PressedMove() const { return false; }
+  bool PressedCrouch() const { return false; }
 
-	friend struct MyStates;
-	StateMachine mStateMachine;
+  friend struct MyStates;
+  StateMachine mStateMachine;
 };
 
-struct MyStates
-{
-	struct BaseState : StateWithOwner<MyOwner>
-	{
-	};
+struct MyStates {
+  struct BaseState : StateWithOwner<MyOwner> {};
 
-	struct Alive : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().IsDead())
-				return SiblingTransition<Dead>();
+  struct Alive : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().IsDead())
+        return SiblingTransition<Dead>("Dead");
 
-			return InnerEntryTransition<Locomotion>();
-		}
-	};
+      return InnerEntryTransition<Locomotion>("Locomotion");
+    }
+  };
 
-	struct Dead : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return NoTransition();
-		}
-	};
+  struct Dead : BaseState {
+    virtual Transition GetTransition() { return NoTransition(); }
+  };
 
-	struct Locomotion : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().PressedJump())
-				return SiblingTransition<Jump>();
+  struct Locomotion : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().PressedJump())
+        return SiblingTransition<Jump>("Jump");
 
-			if (Owner().PressedShoot())
-				return SiblingTransition<Shoot>();
+      if (Owner().PressedShoot())
+        return SiblingTransition<Shoot>("Shoot");
 
-			return InnerEntryTransition<Locomotion_Stand>();
-		}
-	};
+      return InnerEntryTransition<Locomotion_Stand>("Locomotion_Stand");
+    }
+  };
 
-	struct Jump : BaseState
-	{
-		bool FinishedJumping() const { return false; }
+  struct Jump : BaseState {
+    bool FinishedJumping() const { return false; }
 
-		virtual Transition GetTransition()
-		{
-			if (FinishedJumping())
-				return SiblingTransition<Locomotion>();
+    virtual Transition GetTransition() {
+      if (FinishedJumping())
+        return SiblingTransition<Locomotion>("Locomotion");
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Shoot : BaseState
-	{
-		bool FinishedShooting() const { return false; }
+  struct Shoot : BaseState {
+    bool FinishedShooting() const { return false; }
 
-		virtual Transition GetTransition()
-		{
-			if (FinishedShooting())
-				return SiblingTransition<Locomotion>();
+    virtual Transition GetTransition() {
+      if (FinishedShooting())
+        return SiblingTransition<Locomotion>("Locomotion");
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Locomotion_Stand : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().PressedMove())
-				return SiblingTransition<Locomotion_Move>();
+  struct Locomotion_Stand : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().PressedMove())
+        return SiblingTransition<Locomotion_Move>("Locomotion_Move");
 
-			if (Owner().PressedCrouch())
-				return SiblingTransition<Locomotion_Crouch>();
+      if (Owner().PressedCrouch())
+        return SiblingTransition<Locomotion_Crouch>("Locomotion_Crouch");
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Locomotion_Move : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (!Owner().PressedMove())
-				return SiblingTransition<Locomotion_Stand>();
+  struct Locomotion_Move : BaseState {
+    virtual Transition GetTransition() {
+      if (!Owner().PressedMove())
+        return SiblingTransition<Locomotion_Stand>("Locomotion_Stand");
 
-			if (Owner().PressedCrouch())
-				return SiblingTransition<Locomotion_Crouch>();
+      if (Owner().PressedCrouch())
+        return SiblingTransition<Locomotion_Crouch>("Locomotion_Crouch");
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Locomotion_Crouch : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().PressedMove())
-				return SiblingTransition<Locomotion_Move>();
+  struct Locomotion_Crouch : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().PressedMove())
+        return SiblingTransition<Locomotion_Move>("Locomotion_Move");
 
-			if (Owner().PressedCrouch())
-				return SiblingTransition<Locomotion_Stand>();
+      if (Owner().PressedCrouch())
+        return SiblingTransition<Locomotion_Stand>("Locomotion_Stand");
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 };
 
-MyOwner::MyOwner()
-{
-	mStateMachine.Initialize<MyStates::Alive>(this);
-	mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
+MyOwner::MyOwner() {
+  mStateMachine.Initialize<MyStates::Alive>(this);
+  mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
 }
 
-void MyOwner::UpdateStateMachine()
-{
-	mStateMachine.ProcessStateTransitions();
-	mStateMachine.UpdateStates();
+void MyOwner::UpdateStateMachine() {
+  mStateMachine.ProcessStateTransitions();
+  mStateMachine.UpdateStates();
 }
 
-int main()
-{
-	MyOwner myOwner;
-	myOwner.UpdateStateMachine();
+int main() {
+  MyOwner myOwner;
+  myOwner.UpdateStateMachine();
 }

@@ -4,174 +4,140 @@
 
 using namespace hsm;
 
-class Character
-{
+class Character {
 public:
-	Character();
-	void Update();
+  Character();
+  void Update();
 
-	// Public to simplify sample
-	bool mMove;
-	bool mJump;
+  // Public to simplify sample
+  bool mMove;
+  bool mJump;
 
 private:
-	friend struct CharacterStates;
-	StateMachine mStateMachine;
+  friend struct CharacterStates;
+  StateMachine mStateMachine;
 };
 
-struct CharacterStates
-{
-	// Example: utility functions in base-most state to share across all states
-	struct BaseState : StateWithOwner<Character>
-	{
-		void ClearJump() { Owner().mJump = false; }
-	};
+struct CharacterStates {
+  // Example: utility functions in base-most state to share across all states
+  struct BaseState : StateWithOwner<Character> {
+    void ClearJump() { Owner().mJump = false; }
+  };
 
-	struct Alive : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			//return InnerEntryTransition<Locomotion>();
-			return InnerEntryTransition<JumpAndMove>();
-		}
-	};
+  struct Alive : BaseState {
+    virtual Transition GetTransition() {
+      // return InnerEntryTransition<Locomotion>("Locomotion");
+      return InnerEntryTransition<JumpAndMove>("JumpAndMove");
+    }
+  };
 
-	// Example: utility functions for a subset of states
-	struct LocomotionBaseState : BaseState
-	{
-		bool ShouldJump() const
-		{
-			return Owner().mJump;
-		}
+  // Example: utility functions for a subset of states
+  struct LocomotionBaseState : BaseState {
+    bool ShouldJump() const { return Owner().mJump; }
 
-		bool ShouldMove() const
-		{
-			// Jumping has priority over moving
-			return !ShouldJump() && Owner().mMove;
-		}
+    bool ShouldMove() const {
+      // Jumping has priority over moving
+      return !ShouldJump() && Owner().mMove;
+    }
 
-		bool ShouldStand() const
-		{
-			return !ShouldJump() && !ShouldMove();
-		}
-	};
-	
-	struct Locomotion : LocomotionBaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return InnerEntryTransition<Selector>();
-		}
-	};
+    bool ShouldStand() const { return !ShouldJump() && !ShouldMove(); }
+  };
 
-	struct Selector : LocomotionBaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (ShouldJump())
-				return SiblingTransition<Jump>();
+  struct Locomotion : LocomotionBaseState {
+    virtual Transition GetTransition() {
+      return InnerEntryTransition<Selector>("Selector");
+    }
+  };
 
-			if (ShouldMove())
-				return SiblingTransition<Move>();
+  struct Selector : LocomotionBaseState {
+    virtual Transition GetTransition() {
+      if (ShouldJump())
+        return SiblingTransition<Jump>("Jump");
 
-			assert(ShouldStand());
-			return SiblingTransition<Stand>();
-		}
-	};
+      if (ShouldMove())
+        return SiblingTransition<Move>("Move");
 
-	struct Stand : LocomotionBaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (!ShouldStand())
-				return SiblingTransition<Selector>();
+      assert(ShouldStand());
+      return SiblingTransition<Stand>("Stand");
+    }
+  };
 
-			return NoTransition();
-		}
-	};
+  struct Stand : LocomotionBaseState {
+    virtual Transition GetTransition() {
+      if (!ShouldStand())
+        return SiblingTransition<Selector>("Selector");
 
-	struct Move : LocomotionBaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (!ShouldMove())
-				return SiblingTransition<Selector>();
+      return NoTransition();
+    }
+  };
 
-			return NoTransition();
-		}
-	};
+  struct Move : LocomotionBaseState {
+    virtual Transition GetTransition() {
+      if (!ShouldMove())
+        return SiblingTransition<Selector>("Selector");
 
-	struct Jump : LocomotionBaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (!ShouldJump())
-				return SiblingTransition<Selector>();
+      return NoTransition();
+    }
+  };
 
-			return NoTransition();
-		}
-	};
+  struct Jump : LocomotionBaseState {
+    virtual Transition GetTransition() {
+      if (!ShouldJump())
+        return SiblingTransition<Selector>("Selector");
 
-	// Example: sharing utility functions from multiple base states by
-	// chaining template classes
-	template <typename BaseType = BaseState>
-	struct JumpBaseState : BaseType
-	{
-		using BaseType::Owner;
+      return NoTransition();
+    }
+  };
 
-		void ClearJump() { Owner().mJump = false; }
-	};
+  // Example: sharing utility functions from multiple base states by
+  // chaining template classes
+  template <typename BaseType = BaseState> struct JumpBaseState : BaseType {
+    using BaseType::Owner;
 
-	template <typename BaseType = BaseState>
-	struct MoveBaseState : BaseType
-	{
-		using BaseType::Owner;
+    void ClearJump() { Owner().mJump = false; }
+  };
 
-		void ClearMove() { Owner().mMove = false; }
-	};
+  template <typename BaseType = BaseState> struct MoveBaseState : BaseType {
+    using BaseType::Owner;
 
-	struct JumpAndMove : JumpBaseState< MoveBaseState<> >
-	{
-		virtual void OnEnter()
-		{
-			ClearJump();
-			ClearMove();
-		}
-	};
+    void ClearMove() { Owner().mMove = false; }
+  };
+
+  struct JumpAndMove : JumpBaseState<MoveBaseState<>> {
+    virtual void OnEnter() {
+      ClearJump();
+      ClearMove();
+    }
+  };
 };
 
-Character::Character()
-	: mMove(false)
-	, mJump(false)
-{
-	mStateMachine.Initialize<CharacterStates::Alive>(this);
-	mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
+Character::Character() : mMove(false), mJump(false) {
+  mStateMachine.Initialize<CharacterStates::Alive>(this);
+  mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
 }
 
-void Character::Update()
-{
-	printf(">>> Character::Update\n");
+void Character::Update() {
+  printf(">>> Character::Update\n");
 
-	// Update state machine
-	mStateMachine.ProcessStateTransitions();
-	mStateMachine.UpdateStates();
+  // Update state machine
+  mStateMachine.ProcessStateTransitions();
+  mStateMachine.UpdateStates();
 }
 
-int main()
-{
-	Character character;
+int main() {
+  Character character;
 
-	character.Update();
+  character.Update();
 
-	character.mMove = true;
-	character.Update();
+  character.mMove = true;
+  character.Update();
 
-	character.mJump = true;
-	character.Update();
+  character.mJump = true;
+  character.Update();
 
-	character.mJump = false;
-	character.Update();
+  character.mJump = false;
+  character.Update();
 
-	character.mMove = false;
-	character.Update();
+  character.mMove = false;
+  character.Update();
 }

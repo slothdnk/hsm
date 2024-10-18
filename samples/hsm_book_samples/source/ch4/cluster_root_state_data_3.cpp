@@ -4,141 +4,113 @@
 
 using namespace hsm;
 
-class Character
-{
+class Character {
 public:
-	Character();
-	void Update();
+  Character();
+  void Update();
 
-	bool mJump;
+  bool mJump;
 
 private:
-	friend struct CharacterStates;
-	StateMachine mStateMachine;
+  friend struct CharacterStates;
+  StateMachine mStateMachine;
 };
 
-struct CharacterStates
-{
-	template <typename RootStateType, typename BaseStateType>
-	struct ClusterBaseState : BaseStateType
-	{
-		ClusterBaseState() : mRootState(NULL) {}
+struct CharacterStates {
+  template <typename RootStateType, typename BaseStateType>
+  struct ClusterBaseState : BaseStateType {
+    ClusterBaseState() : mRootState(NULL) {}
 
-		virtual void OnEnter()
-		{
-			mRootState = this->template GetOuterState<RootStateType>();
-			assert(mRootState);
-		}
+    virtual void OnEnter() {
+      mRootState = this->template GetOuterState<RootStateType>();
+      assert(mRootState);
+    }
 
-		RootStateType& ClusterRootState()
-		{
-			return *mRootState;
-		}
+    RootStateType &ClusterRootState() { return *mRootState; }
 
-	private:
-		RootStateType* mRootState;
-	};
+  private:
+    RootStateType *mRootState;
+  };
 
-	struct BaseState : StateWithOwner<Character>
-	{
-	};
+  struct BaseState : StateWithOwner<Character> {};
 
-	struct Alive : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return InnerEntryTransition<Stand>();
-		}
-	};
+  struct Alive : BaseState {
+    virtual Transition GetTransition() {
+      return InnerEntryTransition<Stand>("Stand");
+    }
+  };
 
-	struct Stand : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().mJump)
-			{
-				Owner().mJump = false;
-				return SiblingTransition<Jump>();
-			}
+  struct Stand : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().mJump) {
+        Owner().mJump = false;
+        return SiblingTransition<Jump>("Jump");
+      }
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Jump : BaseState
-	{
-		int mJumpValue1;
-		float mJumpValue2;
-		bool mJumpValue3;
+  struct Jump : BaseState {
+    int mJumpValue1;
+    float mJumpValue2;
+    bool mJumpValue3;
 
-		Jump() : mJumpValue1(0), mJumpValue2(0.0f), mJumpValue3(false) { }
+    Jump() : mJumpValue1(0), mJumpValue2(0.0f), mJumpValue3(false) {}
 
-		virtual Transition GetTransition()
-		{
-			if (IsInInnerState<Jump_Done>())
-				return SiblingTransition<Stand>();
+    virtual Transition GetTransition() {
+      if (IsInInnerState<Jump_Done>())
+        return SiblingTransition<Stand>("Stand");
 
-			return InnerEntryTransition<Jump_Up>();
-		}
-	};
+      return InnerEntryTransition<Jump_Up>("Jump_Up");
+    }
+  };
 
-	typedef ClusterBaseState<Jump, BaseState> JumpBaseState;
+  typedef ClusterBaseState<Jump, BaseState> JumpBaseState;
 
-	struct Jump_Up : JumpBaseState
-	{
-		virtual void OnEnter()
-		{
-			JumpBaseState::OnEnter();
-			ClusterRootState().mJumpValue1 = 1;
-			ClusterRootState().mJumpValue2 = 2.0f;
-			ClusterRootState().mJumpValue3 = true;
-		}
+  struct Jump_Up : JumpBaseState {
+    virtual void OnEnter() {
+      JumpBaseState::OnEnter();
+      ClusterRootState().mJumpValue1 = 1;
+      ClusterRootState().mJumpValue2 = 2.0f;
+      ClusterRootState().mJumpValue3 = true;
+    }
 
-		virtual Transition GetTransition()
-		{
-			return SiblingTransition<Jump_Down>();
-		}
-	};
+    virtual Transition GetTransition() {
+      return SiblingTransition<Jump_Down>("Jump_Down");
+    }
+  };
 
-	struct Jump_Down : JumpBaseState
-	{
-		virtual void OnEnter()
-		{
-			JumpBaseState::OnEnter();
-			ClusterRootState().mJumpValue1 = 2;
-			ClusterRootState().mJumpValue2 = 4.0f;
-			ClusterRootState().mJumpValue3 = false;
-		}
+  struct Jump_Down : JumpBaseState {
+    virtual void OnEnter() {
+      JumpBaseState::OnEnter();
+      ClusterRootState().mJumpValue1 = 2;
+      ClusterRootState().mJumpValue2 = 4.0f;
+      ClusterRootState().mJumpValue3 = false;
+    }
 
-		virtual Transition GetTransition()
-		{
-			return SiblingTransition<Jump_Done>();
-		}
-	};
+    virtual Transition GetTransition() {
+      return SiblingTransition<Jump_Done>("Jump_Done");
+    }
+  };
 
-	struct Jump_Done : BaseState
-	{
-	};
+  struct Jump_Done : BaseState {};
 };
 
-Character::Character()
-	: mJump(false)
-{
-	mStateMachine.Initialize<CharacterStates::Alive>(this);
-	mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
+Character::Character() : mJump(false) {
+  mStateMachine.Initialize<CharacterStates::Alive>(this);
+  mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
 }
 
-void Character::Update()
-{
-	// Update state machine
-	mStateMachine.ProcessStateTransitions();
-	mStateMachine.UpdateStates();
+void Character::Update() {
+  // Update state machine
+  mStateMachine.ProcessStateTransitions();
+  mStateMachine.UpdateStates();
 }
 
-int main()
-{
-	Character character;
-	character.Update();
-	character.mJump = true;
-	character.Update();
+int main() {
+  Character character;
+  character.Update();
+  character.mJump = true;
+  character.Update();
 }

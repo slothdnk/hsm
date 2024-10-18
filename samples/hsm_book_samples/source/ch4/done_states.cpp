@@ -4,112 +4,93 @@
 
 using namespace hsm;
 
-class Character
-{
+class Character {
 public:
-	Character();
-	void Update();
+  Character();
+  void Update();
 
-	// Public to simplify sample
-	bool mOpenDoor;
+  // Public to simplify sample
+  bool mOpenDoor;
 
 private:
-	friend struct CharacterStates;
-	StateMachine mStateMachine;
+  friend struct CharacterStates;
+  StateMachine mStateMachine;
 };
 
-struct CharacterStates
-{
-	struct BaseState : StateWithOwner<Character>
-	{
-	};
+struct CharacterStates {
+  struct BaseState : StateWithOwner<Character> {};
 
-	struct Alive : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return InnerEntryTransition<Stand>();
-		}
-	};
+  struct Alive : BaseState {
+    virtual Transition GetTransition() {
+      return InnerEntryTransition<Stand>("Stand");
+    }
+  };
 
-	struct Stand : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().mOpenDoor)
-			{
-				Owner().mOpenDoor = false;
-				return SiblingTransition<OpenDoor>();
-			}
-			
-			return NoTransition();
-		}
-	};
+  struct Stand : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().mOpenDoor) {
+        Owner().mOpenDoor = false;
+        return SiblingTransition<OpenDoor>("OpenDoor");
+      }
 
-	struct OpenDoor : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (IsInInnerState<OpenDoor_Done>())
-				return SiblingTransition<Stand>();
+      return NoTransition();
+    }
+  };
 
-			return InnerEntryTransition<OpenDoor_GetIntoPosition>();
-		}
-	};
+  struct OpenDoor : BaseState {
+    virtual Transition GetTransition() {
+      if (IsInInnerState<OpenDoor_Done>())
+        return SiblingTransition<Stand>("Stand");
 
-	struct OpenDoor_GetIntoPosition : BaseState
-	{
-		bool IsInPosition() const { return true; } // Stub
+      return InnerEntryTransition<OpenDoor_GetIntoPosition>(
+          "OpenDoor_GetIntoPosition");
+    }
+  };
 
-		virtual Transition GetTransition()
-		{
-			if (IsInPosition())
-				return SiblingTransition<OpenDoor_PlayOpenAnim>();
+  struct OpenDoor_GetIntoPosition : BaseState {
+    bool IsInPosition() const { return true; } // Stub
 
-			return NoTransition();
-		}
-	};
+    virtual Transition GetTransition() {
+      if (IsInPosition())
+        return SiblingTransition<OpenDoor_PlayOpenAnim>(
+            "OpenDoor_PlayOpenAnim");
 
-	struct OpenDoor_PlayOpenAnim : BaseState
-	{
-		bool IsAnimDone() const { return true; } // Stub
+      return NoTransition();
+    }
+  };
 
-		virtual Transition GetTransition()
-		{
-			if (IsAnimDone())
-				return SiblingTransition<OpenDoor_Done>();
+  struct OpenDoor_PlayOpenAnim : BaseState {
+    bool IsAnimDone() const { return true; } // Stub
 
-			return NoTransition();
-		}
-	};
+    virtual Transition GetTransition() {
+      if (IsAnimDone())
+        return SiblingTransition<OpenDoor_Done>("OpenDoor_Done");
 
-	struct OpenDoor_Done : BaseState
-	{
-	};
+      return NoTransition();
+    }
+  };
+
+  struct OpenDoor_Done : BaseState {};
 };
 
-Character::Character()
-	: mOpenDoor(false)
-{
-	mStateMachine.Initialize<CharacterStates::Alive>(this);
-	mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
+Character::Character() : mOpenDoor(false) {
+  mStateMachine.Initialize<CharacterStates::Alive>(this);
+  mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
 }
 
-void Character::Update()
-{
-	printf(">>> Character::Update\n");
+void Character::Update() {
+  printf(">>> Character::Update\n");
 
-	// Update state machine
-	mStateMachine.ProcessStateTransitions();
-	mStateMachine.UpdateStates();
+  // Update state machine
+  mStateMachine.ProcessStateTransitions();
+  mStateMachine.UpdateStates();
 }
 
-int main()
-{
-	Character character;
+int main() {
+  Character character;
 
-	character.Update();
+  character.Update();
 
-	character.mOpenDoor = true;
-	character.Update();
+  character.mOpenDoor = true;
+  character.Update();
 }
