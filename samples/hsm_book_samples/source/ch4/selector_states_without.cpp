@@ -4,144 +4,117 @@
 
 using namespace hsm;
 
-class Character
-{
+class Character {
 public:
-	Character();
-	void Update();
+  Character();
+  void Update();
 
-	// Public to simplify sample
-	bool mMove;
-	bool mJump;
+  // Public to simplify sample
+  bool mMove;
+  bool mJump;
 
 private:
-	friend struct CharacterStates;
-	StateMachine mStateMachine;
+  friend struct CharacterStates;
+  StateMachine mStateMachine;
 };
 
-struct CharacterStates
-{
-	struct BaseState : StateWithOwner<Character>
-	{
-	};
+struct CharacterStates {
+  struct BaseState : StateWithOwner<Character> {};
 
-	struct Alive : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return InnerEntryTransition<Locomotion>();
-		}
-	};
+  struct Alive : BaseState {
+    virtual Transition GetTransition() {
+      return InnerEntryTransition<Locomotion>("Locomotion");
+    }
+  };
 
-	struct LocomotionBaseState : BaseState
-	{
-		bool ShouldJump() const
-		{
-			return Owner().mJump;
-		}
+  struct LocomotionBaseState : BaseState {
+    bool ShouldJump() const { return Owner().mJump; }
 
-		bool ShouldMove() const
-		{
-			// Jumping has priority over moving
-			return !ShouldJump() && Owner().mMove;
-		}
+    bool ShouldMove() const {
+      // Jumping has priority over moving
+      return !ShouldJump() && Owner().mMove;
+    }
 
-		bool ShouldStand() const
-		{
-			return !ShouldJump() && !ShouldMove();
-		}
-	};
+    bool ShouldStand() const { return !ShouldJump() && !ShouldMove(); }
+  };
 
-	struct Locomotion : LocomotionBaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (ShouldJump())
-				return InnerEntryTransition<Jump>();
+  struct Locomotion : LocomotionBaseState {
+    virtual Transition GetTransition() {
+      if (ShouldJump())
+        return InnerEntryTransition<Jump>("Jump");
 
-			if (ShouldMove())
-				return InnerEntryTransition<Move>();
+      if (ShouldMove())
+        return InnerEntryTransition<Move>("Move");
 
-			assert(ShouldStand());
-			return InnerEntryTransition<Stand>();
-		}
-	};
+      assert(ShouldStand());
+      return InnerEntryTransition<Stand>("Stand");
+    }
+  };
 
-	struct Stand : LocomotionBaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (ShouldJump())
-				return SiblingTransition<Jump>();
+  struct Stand : LocomotionBaseState {
+    virtual Transition GetTransition() {
+      if (ShouldJump())
+        return SiblingTransition<Jump>("Jump");
 
-			if (ShouldMove())
-				return SiblingTransition<Move>();
+      if (ShouldMove())
+        return SiblingTransition<Move>("Move");
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Move : LocomotionBaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (ShouldJump())
-				return SiblingTransition<Jump>();
+  struct Move : LocomotionBaseState {
+    virtual Transition GetTransition() {
+      if (ShouldJump())
+        return SiblingTransition<Jump>("Jump");
 
-			if (ShouldStand())
-				return SiblingTransition<Stand>();
+      if (ShouldStand())
+        return SiblingTransition<Stand>("Stand");
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Jump : LocomotionBaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (ShouldMove())
-				return SiblingTransition<Move>();
+  struct Jump : LocomotionBaseState {
+    virtual Transition GetTransition() {
+      if (ShouldMove())
+        return SiblingTransition<Move>("Move");
 
-			if (ShouldStand())
-				return SiblingTransition<Stand>();
+      if (ShouldStand())
+        return SiblingTransition<Stand>("Stand");
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 };
 
-Character::Character()
-	: mMove(false)
-	, mJump(false)
-{
-	mStateMachine.Initialize<CharacterStates::Alive>(this);
-	mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
+Character::Character() : mMove(false), mJump(false) {
+  mStateMachine.Initialize<CharacterStates::Alive>(this);
+  mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
 }
 
-void Character::Update()
-{
-	printf(">>> Character::Update\n");
+void Character::Update() {
+  printf(">>> Character::Update\n");
 
-	// Update state machine
-	mStateMachine.ProcessStateTransitions();
-	mStateMachine.UpdateStates();
+  // Update state machine
+  mStateMachine.ProcessStateTransitions();
+  mStateMachine.UpdateStates();
 }
 
-int main()
-{
-	Character character;
+int main() {
+  Character character;
 
-	character.Update();
+  character.Update();
 
-	character.mMove = true;
-	character.Update();
+  character.mMove = true;
+  character.Update();
 
-	character.mJump = true;
-	character.Update();
+  character.mJump = true;
+  character.Update();
 
-	character.mJump = false;
-	character.Update();
+  character.mJump = false;
+  character.Update();
 
-	character.mMove = false;
-	character.Update();
+  character.mMove = false;
+  character.Update();
 }

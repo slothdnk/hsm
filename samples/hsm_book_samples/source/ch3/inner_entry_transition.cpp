@@ -4,97 +4,77 @@
 
 using namespace hsm;
 
-class MyOwner
-{
+class MyOwner {
 public:
-	MyOwner();
-	void UpdateStateMachine();
+  MyOwner();
+  void UpdateStateMachine();
 
-	void Die() { mDead = true; }
+  void Die() { mDead = true; }
 
 private:
-	bool IsDead() const { return mDead; } // Stub
-	bool PressedMove() const { return false; } // Stub
+  bool IsDead() const { return mDead; }      // Stub
+  bool PressedMove() const { return false; } // Stub
 
-	bool mDead;
+  bool mDead;
 
-	friend struct MyStates;
-	StateMachine mStateMachine;
+  friend struct MyStates;
+  StateMachine mStateMachine;
 };
 
-struct MyStates
-{
-	struct BaseState : StateWithOwner<MyOwner>
-	{
-	};
+struct MyStates {
+  struct BaseState : StateWithOwner<MyOwner> {};
 
-	struct Alive : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().IsDead())
-				return SiblingTransition<Dead>();
+  struct Alive : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().IsDead())
+        return SiblingTransition<Dead>("Dead");
 
-			return InnerEntryTransition<Locomotion>();
-		}
-	};
+      return InnerEntryTransition<Locomotion>("Locomotion");
+    }
+  };
 
-	struct Dead : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return NoTransition();
-		}
-	};
+  struct Dead : BaseState {
+    virtual Transition GetTransition() { return NoTransition(); }
+  };
 
-	struct Locomotion : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return InnerEntryTransition<Stand>();
-		}
-	};
+  struct Locomotion : BaseState {
+    virtual Transition GetTransition() {
+      return InnerEntryTransition<Stand>("Stand");
+    }
+  };
 
-	struct Stand : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().PressedMove())
-				return SiblingTransition<Move>();
+  struct Stand : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().PressedMove())
+        return SiblingTransition<Move>("Move");
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Move : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (!Owner().PressedMove())
-				return SiblingTransition<Stand>();
+  struct Move : BaseState {
+    virtual Transition GetTransition() {
+      if (!Owner().PressedMove())
+        return SiblingTransition<Stand>("Stand");
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 };
 
-MyOwner::MyOwner()
-	: mDead(false)
-{
-	mStateMachine.Initialize<MyStates::Alive>(this);
-	mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
+MyOwner::MyOwner() : mDead(false) {
+  mStateMachine.Initialize<MyStates::Alive>(this);
+  mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
 }
 
-void MyOwner::UpdateStateMachine()
-{
-	mStateMachine.ProcessStateTransitions();
-	mStateMachine.UpdateStates();
+void MyOwner::UpdateStateMachine() {
+  mStateMachine.ProcessStateTransitions();
+  mStateMachine.UpdateStates();
 }
 
-int main()
-{
-	MyOwner myOwner;
-	myOwner.UpdateStateMachine();
-	myOwner.Die();
-	myOwner.UpdateStateMachine();
+int main() {
+  MyOwner myOwner;
+  myOwner.UpdateStateMachine();
+  myOwner.Die();
+  myOwner.UpdateStateMachine();
 }

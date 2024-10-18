@@ -1,179 +1,145 @@
 // restarting_states.cpp
 
 #include "hsm.h"
+#include <string>
 
 using namespace hsm;
 
-class AnimComponent
-{
+class AnimComponent {
 public:
-	AnimComponent() {}
-	void PlayAnim(const char* name)
-	{
-		printf(">>> PlayAnim: %s\n", name);
-	}
+  AnimComponent() {}
+  void PlayAnim(const char *name) { printf(">>> PlayAnim: %s\n", name); }
 
-	bool IsFinished() const { return false; } // Stub
+  bool IsFinished() const { return false; } // Stub
 
-	// Return true if input event was processed in animation
-	bool PollEvent(const char*) { return true; } // Stub
+  // Return true if input event was processed in animation
+  bool PollEvent(const char *) { return true; } // Stub
 };
 
-class Character
-{
+class Character {
 public:
-	Character();
-	void Update();
+  Character();
+  void Update();
 
-	// Public to simplify sample
-	bool mMove;
-	bool mAttack;
+  // Public to simplify sample
+  bool mMove;
+  bool mAttack;
 
 private:
-	friend struct CharacterStates;
-	StateMachine mStateMachine;
+  friend struct CharacterStates;
+  StateMachine mStateMachine;
 
-	AnimComponent mAnimComponent;
+  AnimComponent mAnimComponent;
 };
 
-struct CharacterStates
-{
-	struct BaseState : StateWithOwner<Character>
-	{
-	};
+struct CharacterStates {
+  struct BaseState : StateWithOwner<Character> {};
 
-	struct Alive : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return InnerEntryTransition<Locomotion>();
-		}
-	};
+  struct Alive : BaseState {
+    virtual Transition GetTransition() {
+      return InnerEntryTransition<Locomotion>("Locomotion");
+    }
+  };
 
-	struct Locomotion : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().mAttack)
-			{
-				// Start attack sequence with combo index 0
-				return SiblingTransition<Attack>(0);
-			}
+  struct Locomotion : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().mAttack) {
+        // Start attack sequence with combo index 0
+        return SiblingTransition<Attack>(0);
+      }
 
-			return InnerEntryTransition<Stand>();
-		}
-	};
+      return InnerEntryTransition<Stand>("Stand");
+    }
+  };
 
-	struct Stand : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().mMove)
-				return SiblingTransition<Move>();
+  struct Stand : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().mMove)
+        return SiblingTransition<Move>("Move");
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Move : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (!Owner().mMove)
-				return SiblingTransition<Stand>();
+  struct Move : BaseState {
+    virtual Transition GetTransition() {
+      if (!Owner().mMove)
+        return SiblingTransition<Stand>("Stand");
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Attack : BaseState
-	{
-		virtual void OnEnter(int comboIndex)
-		{
-			Owner().mAttack = false;
+  struct Attack : BaseState {
+    virtual void OnEnter(int comboIndex) {
+      Owner().mAttack = false;
 
-			mComboIndex = comboIndex;
+      mComboIndex = comboIndex;
 
-			static const char* AttackAnim[] =
-			{
-				"Attack_1",
-				"Attack_2",
-				"Attack_3"
-			};
-			assert(mComboIndex < sizeof(AttackAnim) / sizeof(AttackAnim[0]));
+      static const char *AttackAnim[] = {"Attack_1", "Attack_2", "Attack_3"};
+      assert(mComboIndex < sizeof(AttackAnim) / sizeof(AttackAnim[0]));
 
-			Owner().mAnimComponent.PlayAnim(AttackAnim[mComboIndex]);
-		}
+      Owner().mAnimComponent.PlayAnim(AttackAnim[mComboIndex]);
+    }
 
-		virtual Transition GetTransition()
-		{
-			// Check if player can chain next attack
-			if (Owner().mAttack
-				&& mComboIndex < 2
-				&& Owner().mAnimComponent.PollEvent("CanChainCombo"))
-			{
-				// Restart state with next combo index
-				return SiblingTransition<Attack>(mComboIndex + 1);
-			}
+    virtual Transition GetTransition() {
+      // Check if player can chain next attack
+      if (Owner().mAttack && mComboIndex < 2 &&
+          Owner().mAnimComponent.PollEvent("CanChainCombo")) {
+        // Restart state with next combo index
+        return SiblingTransition<Attack>(std::to_string(mComboIndex + 1));
+      }
 
-			if (Owner().mAnimComponent.IsFinished())
-				return SiblingTransition<Locomotion>();
+      if (Owner().mAnimComponent.IsFinished())
+        return SiblingTransition<Locomotion>("Locomotion");
 
-			return NoTransition();
-		}
+      return NoTransition();
+    }
 
-		virtual void Update()
-		{
-			printf(">>> Attacking: %d\n", mComboIndex);
-		}
+    virtual void Update() { printf(">>> Attacking: %d\n", mComboIndex); }
 
-		int mComboIndex;
-	};
+    int mComboIndex;
+  };
 };
 
-Character::Character()
-	: mMove(false)
-	, mAttack(false)
-{
-	mStateMachine.Initialize<CharacterStates::Alive>(this);
-	mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
+Character::Character() : mMove(false), mAttack(false) {
+  mStateMachine.Initialize<CharacterStates::Alive>(this);
+  mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
 }
 
-void Character::Update()
-{
-	// Update state machine
-	mStateMachine.ProcessStateTransitions();
-	mStateMachine.UpdateStates();
+void Character::Update() {
+  // Update state machine
+  mStateMachine.ProcessStateTransitions();
+  mStateMachine.UpdateStates();
 }
 
-int main()
-{
-	Character character;
+int main() {
+  Character character;
 
-	character.Update();
+  character.Update();
 
-	character.mMove = true;
-	character.Update();
+  character.mMove = true;
+  character.Update();
 
-	// First attack
-	character.mAttack = true;
-	character.Update();
-	character.Update();
-	character.Update();
+  // First attack
+  character.mAttack = true;
+  character.Update();
+  character.Update();
+  character.Update();
 
-	// Second attack combo
-	character.mAttack = true;
-	character.Update();
-	character.Update();
-	character.Update();
+  // Second attack combo
+  character.mAttack = true;
+  character.Update();
+  character.Update();
+  character.Update();
 
-	// Third attack combo
-	character.mAttack = true;
-	character.Update();
-	character.Update();
-	character.Update();
+  // Third attack combo
+  character.mAttack = true;
+  character.Update();
+  character.Update();
+  character.Update();
 
-	// Another attack has no effect (reached our max combo of 3)
-	character.mAttack = true;
-	character.Update();
+  // Another attack has no effect (reached our max combo of 3)
+  character.mAttack = true;
+  character.Update();
 }

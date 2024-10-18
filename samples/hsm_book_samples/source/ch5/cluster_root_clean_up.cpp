@@ -4,111 +4,85 @@
 
 using namespace hsm;
 
-class Character
-{
+class Character {
 public:
-	Character();
-	void Update();
+  Character();
+  void Update();
 
 private:
-	bool IsHurt() const { return false; }
-	bool ShouldGetOnLadder() const { return true; }
-	bool ShouldGetOffLadder() const { return false; }
-	void AttachToLadder() {}
-	void DetachFromLadder() {}
+  bool IsHurt() const { return false; }
+  bool ShouldGetOnLadder() const { return true; }
+  bool ShouldGetOffLadder() const { return false; }
+  void AttachToLadder() {}
+  void DetachFromLadder() {}
 
-	friend struct CharacterStates;
-	StateMachine mStateMachine;
+  friend struct CharacterStates;
+  StateMachine mStateMachine;
 };
 
-struct CharacterStates
-{
-	struct BaseState : StateWithOwner<Character>
-	{
-	};
+struct CharacterStates {
+  struct BaseState : StateWithOwner<Character> {};
 
-	struct Alive : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().IsHurt())
-				return SiblingTransition<Hurt>();
+  struct Alive : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().IsHurt())
+        return SiblingTransition<Hurt>("Hurt");
 
-			return InnerEntryTransition<Stand>();
-		}
-	};
+      return InnerEntryTransition<Stand>("Stand");
+    }
+  };
 
-	struct Hurt : BaseState
-	{
-	};
+  struct Hurt : BaseState {};
 
-	struct Stand : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().ShouldGetOnLadder())
-				return SiblingTransition<Ladder>();
+  struct Stand : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().ShouldGetOnLadder())
+        return SiblingTransition<Ladder>("Ladder");
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Ladder : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return InnerEntryTransition<Ladder_GetOn>();
-		}
-	};
+  struct Ladder : BaseState {
+    virtual Transition GetTransition() {
+      return InnerEntryTransition<Ladder_GetOn>("Ladder_GetOn");
+    }
+  };
 
-	struct Ladder_GetOn : BaseState
-	{
-		virtual void OnEnter()
-		{
-			Owner().AttachToLadder();
-		}
+  struct Ladder_GetOn : BaseState {
+    virtual void OnEnter() { Owner().AttachToLadder(); }
 
-		virtual Transition GetTransition()
-		{
-			return SiblingTransition<Ladder_OnLadder>();
-		}
-	};
+    virtual Transition GetTransition() {
+      return SiblingTransition<Ladder_OnLadder>("Ladder_OnLadder");
+    }
+  };
 
-	struct Ladder_OnLadder : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().ShouldGetOffLadder())
-				return SiblingTransition<Ladder_GetOff>();
-			
-			return NoTransition();
-		}
-	};
+  struct Ladder_OnLadder : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().ShouldGetOffLadder())
+        return SiblingTransition<Ladder_GetOff>("Ladder_GetOff");
 
-	struct Ladder_GetOff : BaseState
-	{
-		virtual void OnEnter()
-		{
-			Owner().DetachFromLadder();
-		}
-	};
+      return NoTransition();
+    }
+  };
+
+  struct Ladder_GetOff : BaseState {
+    virtual void OnEnter() { Owner().DetachFromLadder(); }
+  };
 };
 
-Character::Character()
-{
-	mStateMachine.Initialize<CharacterStates::Alive>(this);
-	mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
+Character::Character() {
+  mStateMachine.Initialize<CharacterStates::Alive>(this);
+  mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
 }
 
-void Character::Update()
-{
-	// Update state machine
-	mStateMachine.ProcessStateTransitions();
-	mStateMachine.UpdateStates();
+void Character::Update() {
+  // Update state machine
+  mStateMachine.ProcessStateTransitions();
+  mStateMachine.UpdateStates();
 }
 
-int main()
-{
-	Character character;
-	character.Update();
+int main() {
+  Character character;
+  character.Update();
 }

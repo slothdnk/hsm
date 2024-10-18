@@ -4,219 +4,178 @@
 
 using namespace hsm;
 
-class AnimComponent
-{
+class AnimComponent {
 public:
-	AnimComponent() : mLoop(false) {}
-	void PlayAnim(const char* name, bool loop)
-	{
-		printf(">>> PlayAnim: %s, looping: %s\n", name, loop ? "true" : "false");
-		mLoop = loop;
-	}
+  AnimComponent() : mLoop(false) {}
+  void PlayAnim(const char *name, bool loop) {
+    printf(">>> PlayAnim: %s, looping: %s\n", name, loop ? "true" : "false");
+    mLoop = loop;
+  }
 
-	bool IsFinished() const { return !mLoop; }
+  bool IsFinished() const { return !mLoop; }
 
 private:
-	bool mLoop;
+  bool mLoop;
 };
 
 ////////////////////// Character //////////////////////
 
-class Character
-{
+class Character {
 public:
-	void Update();
+  void Update();
 
 protected:
-	friend struct SharedStates;
-	StateMachine mStateMachine;
-	AnimComponent mAnimComponent;
+  friend struct SharedStates;
+  StateMachine mStateMachine;
+  AnimComponent mAnimComponent;
 };
 
-void Character::Update()
-{
-	// Update state machine
-	mStateMachine.ProcessStateTransitions();
-	mStateMachine.UpdateStates();
+void Character::Update() {
+  // Update state machine
+  mStateMachine.ProcessStateTransitions();
+  mStateMachine.UpdateStates();
 }
 
-struct SharedStates
-{
-	// These states can be shared by state machines with Character-derived owners
+struct SharedStates {
+  // These states can be shared by state machines with Character-derived owners
 
-	struct BaseState : StateWithOwner<Character>
-	{
-	};
+  struct BaseState : StateWithOwner<Character> {};
 
-	struct PlayAnim_Done : BaseState
-	{
-	};
+  struct PlayAnim_Done : BaseState {};
 
-	struct PlayAnim : BaseState
-	{
-		virtual void OnEnter(const char* animName
-			, bool loop = true
-			, const Transition& doneTransition = SiblingTransition<PlayAnim_Done>()
-			)
-		{
-			Owner().mAnimComponent.PlayAnim(animName, loop);
-			mDoneTransition = doneTransition;
-		}
+  struct PlayAnim : BaseState {
+    virtual void
+    OnEnter(const char *animName, bool loop = true,
+            const Transition &doneTransition =
+                SiblingTransition<PlayAnim_Done>("PlayAnim_Done")) {
+      Owner().mAnimComponent.PlayAnim(animName, loop);
+      mDoneTransition = doneTransition;
+    }
 
-		virtual Transition GetTransition()
-		{
-			if (Owner().mAnimComponent.IsFinished())
-				return mDoneTransition;
+    virtual Transition GetTransition() {
+      if (Owner().mAnimComponent.IsFinished())
+        return mDoneTransition;
 
-			return NoTransition();
-		}
+      return NoTransition();
+    }
 
-		Transition mDoneTransition;
-	};
+    Transition mDoneTransition;
+  };
 };
 
 ////////////////////// Hero //////////////////////
 
-class Hero : public Character
-{
+class Hero : public Character {
 public:
-	Hero();
+  Hero();
 
-	// Public to simplify sample
-	bool mAttack;
+  // Public to simplify sample
+  bool mAttack;
 
 private:
-	friend struct HeroStates;
+  friend struct HeroStates;
 };
 
+struct HeroStates {
+  struct BaseState : StateWithOwner<Hero, SharedStates::BaseState> {};
 
-struct HeroStates
-{
-	struct BaseState : StateWithOwner<Hero, SharedStates::BaseState>
-	{
-	};
+  typedef SharedStates::PlayAnim_Done PlayAnim_Done;
+  typedef SharedStates::PlayAnim PlayAnim;
 
-	typedef SharedStates::PlayAnim_Done PlayAnim_Done;
-	typedef SharedStates::PlayAnim PlayAnim;
+  struct Alive : BaseState {
+    virtual Transition GetTransition() {
+      return InnerEntryTransition<Stand>("Stand"
+                                         "Stand");
+    }
+  };
 
-	struct Alive : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return InnerEntryTransition<Stand>();
-		}
-	};
+  struct Stand : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().mAttack) {
+        Owner().mAttack = false;
+        return SiblingTransition<Attack>("Attack");
+      }
 
-	struct Stand : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().mAttack)
-			{
-				Owner().mAttack = false;
-				return SiblingTransition<Attack>();
-			}
+      return NoTransition();
+    }
+  };
 
-			return NoTransition();
-		}
-	};
+  struct Attack : BaseState {
+    virtual Transition GetTransition() {
+      if (IsInInnerState<PlayAnim_Done>())
+        return SiblingTransition<Stand>("Stand");
 
-	struct Attack : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (IsInInnerState<PlayAnim_Done>())
-				return SiblingTransition<Stand>();
-
-			return InnerEntryTransition<PlayAnim>("Attack_1", false);
-		}
-	};
+      return InnerEntryTransition<PlayAnim>("attack_1");
+    }
+  };
 };
 
-Hero::Hero()
-	: mAttack(false)
-{
-	mStateMachine.Initialize<HeroStates::Alive>(this);
-	mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
+Hero::Hero() : mAttack(false) {
+  mStateMachine.Initialize<HeroStates::Alive>(this);
+  mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
 }
-
 
 ////////////////////// Enemy //////////////////////
 
-class Enemy : public Character
-{
+class Enemy : public Character {
 public:
-	Enemy();
+  Enemy();
 
-	// Public to simplify sample
-	bool mAttack;
+  // Public to simplify sample
+  bool mAttack;
 
 private:
-	friend struct EnemyStates;
+  friend struct EnemyStates;
 };
 
-struct EnemyStates
-{
-	struct BaseState : StateWithOwner<Enemy, SharedStates::BaseState>
-	{
-	};
+struct EnemyStates {
+  struct BaseState : StateWithOwner<Enemy, SharedStates::BaseState> {};
 
-	typedef SharedStates::PlayAnim_Done PlayAnim_Done;
-	typedef SharedStates::PlayAnim PlayAnim;
+  typedef SharedStates::PlayAnim_Done PlayAnim_Done;
+  typedef SharedStates::PlayAnim PlayAnim;
 
-	struct Alive : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			return InnerEntryTransition<Stand>();
-		}
-	};
+  struct Alive : BaseState {
+    virtual Transition GetTransition() {
+      return InnerEntryTransition<Stand>("Stand");
+    }
+  };
 
-	struct Stand : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().mAttack)
-			{
-				Owner().mAttack = false;
-				return SiblingTransition<Attack>();
-			}
+  struct Stand : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().mAttack) {
+        Owner().mAttack = false;
+        return SiblingTransition<Attack>("Attack");
+      }
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Attack : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (IsInInnerState<PlayAnim_Done>())
-				return SiblingTransition<Stand>();
+  struct Attack : BaseState {
+    virtual Transition GetTransition() {
+      if (IsInInnerState<PlayAnim_Done>())
+        return SiblingTransition<Stand>("Stand");
 
-			return InnerEntryTransition<PlayAnim>("Attack_1", false);
-		}
-	};
+      return InnerEntryTransition<PlayAnim>("Attack_1");
+    }
+  };
 };
 
-Enemy::Enemy()
-	: mAttack(false)
-{
-	mStateMachine.Initialize<EnemyStates::Alive>(this);
-	mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
+Enemy::Enemy() : mAttack(false) {
+  mStateMachine.Initialize<EnemyStates::Alive>(this);
+  mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
 }
-
 
 ////////////////////// main //////////////////////
 
-int main()
-{
-	Hero hero;
-	hero.Update();
-	hero.mAttack = true;
-	hero.Update();
+int main() {
+  Hero hero;
+  hero.Update();
+  hero.mAttack = true;
+  hero.Update();
 
-	Enemy enemy;
-	enemy.Update();
-	enemy.mAttack = true;
-	enemy.Update();
+  Enemy enemy;
+  enemy.Update();
+  enemy.mAttack = true;
+  enemy.Update();
 }

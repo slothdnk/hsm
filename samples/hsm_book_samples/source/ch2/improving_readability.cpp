@@ -6,43 +6,33 @@
 
 using namespace hsm;
 
-struct MyStates
-{
-	struct First : State
-	{
-		DEFINE_HSM_STATE(First);
+struct MyStates {
+  struct First : State {
+    DEFINE_HSM_STATE(First);
 
-		virtual Transition GetTransition()
-		{
-			return SiblingTransition<Second>();
-		}
-	};
+    virtual Transition GetTransition() {
+      return SiblingTransition<Second>("Second");
+    }
+  };
 
-	struct Second : State
-	{
-		DEFINE_HSM_STATE(Second);
+  struct Second : State {
+    DEFINE_HSM_STATE(Second);
 
-		virtual Transition GetTransition()
-		{
-			return SiblingTransition<Third>();
-		}
-	};
+    virtual Transition GetTransition() {
+      return SiblingTransition<Third>("Third");
+    }
+  };
 
-	struct Third : State
-	{
-		DEFINE_HSM_STATE(Third);
+  struct Third : State {
+    DEFINE_HSM_STATE(Third);
 
-		virtual Transition GetTransition()
-		{
-			return NoTransition();
-		}
-	};
+    virtual Transition GetTransition() { return NoTransition(); }
+  };
 };
 
-int main()
-{
-	StateMachine stateMachine;
-	stateMachine.Initialize<MyStates::First>();
-	stateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
-	stateMachine.ProcessStateTransitions();
+int main() {
+  StateMachine stateMachine;
+  stateMachine.Initialize<MyStates::First>();
+  stateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
+  stateMachine.ProcessStateTransitions();
 }

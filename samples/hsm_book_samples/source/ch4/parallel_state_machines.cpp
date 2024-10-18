@@ -4,271 +4,220 @@
 
 using namespace hsm;
 
-class Hero
-{
+class Hero {
 public:
-	Hero();
-	void Update();
+  Hero();
+  void Update();
 
-	// Public to simplify sample
-	bool mMove;
-	bool mJump;
-	bool mReload;
+  // Public to simplify sample
+  bool mMove;
+  bool mJump;
+  bool mReload;
 
 private:
+  // Functions that simulate playing an animation that always lasts 3 frames
+  void PlayAnim(const char *) { mAnimFrame = 0; }
+  bool IsAnimDone() const { return mAnimFrame >= 2; }
 
-	// Functions that simulate playing an animation that always lasts 3 frames
-	void PlayAnim(const char*) { mAnimFrame = 0; }
-	bool IsAnimDone() const { return mAnimFrame >= 2; }
+  void ReloadWeapon() { printf(">>> WEAPON RELOADED!\n"); }
 
-	void ReloadWeapon() { printf(">>> WEAPON RELOADED!\n"); }
+  friend struct HeroFullBodyStates;
+  friend struct HeroUpperBodyStates;
+  StateMachine mStateMachines[2];
 
-	friend struct HeroFullBodyStates;
-	friend struct HeroUpperBodyStates;
-	StateMachine mStateMachines[2];
+  hsm::StateValue<bool> mUpperBodyEnabled;
 
-	hsm::StateValue<bool> mUpperBodyEnabled;
-
-	int mAnimFrame;
+  int mAnimFrame;
 };
 
-struct HeroFullBodyStates
-{
-	struct BaseState : StateWithOwner<Hero>
-	{
-	};
+struct HeroFullBodyStates {
+  struct BaseState : StateWithOwner<Hero> {};
 
-	struct Alive : BaseState
-	{
-		virtual void OnEnter()
-		{
-			// By default, upper body is enabled
-			SetStateValue(Owner().mUpperBodyEnabled) = true;
-		}
+  struct Alive : BaseState {
+    virtual void OnEnter() {
+      // By default, upper body is enabled
+      SetStateValue(Owner().mUpperBodyEnabled) = true;
+    }
 
-		virtual Transition GetTransition()
-		{
-			return InnerEntryTransition<Stand>();
-		}
-	};
+    virtual Transition GetTransition() {
+      return InnerEntryTransition<Stand>("Stand");
+    }
+  };
 
-	struct Stand : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().mMove)
-			{
-				return SiblingTransition<Move>();
-			}
+  struct Stand : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().mMove) {
+        return SiblingTransition<Move>("Move");
+      }
 
-			if (Owner().mJump)
-			{
-				Owner().mJump = false;
-				return SiblingTransition<Jump>();
-			}
+      if (Owner().mJump) {
+        Owner().mJump = false;
+        return SiblingTransition<Jump>("Jump");
+      }
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Move : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (!Owner().mMove)
-			{
-				return SiblingTransition<Stand>();
-			}
+  struct Move : BaseState {
+    virtual Transition GetTransition() {
+      if (!Owner().mMove) {
+        return SiblingTransition<Stand>("Stand");
+      }
 
-			if (Owner().mJump)
-			{
-				Owner().mJump = false;
-				return SiblingTransition<Jump>();
-			}
-			
-			return NoTransition();
-		}
-	};
+      if (Owner().mJump) {
+        Owner().mJump = false;
+        return SiblingTransition<Jump>("Jump");
+      }
 
-	struct Jump : BaseState
-	{
-		virtual void OnEnter()
-		{
-			// Don't allow upper body to do anything while jumping
-			SetStateValue(Owner().mUpperBodyEnabled) = false;
-			Owner().PlayAnim("Jump");
-		}
+      return NoTransition();
+    }
+  };
 
-		virtual Transition GetTransition()
-		{
-			if (Owner().IsAnimDone())
-			{
-				if (!Owner().mMove)
-				{
-					return SiblingTransition<Stand>();
-				}
-				else
-				{
-					return SiblingTransition<Move>();
-				}
-			}
+  struct Jump : BaseState {
+    virtual void OnEnter() {
+      // Don't allow upper body to do anything while jumping
+      SetStateValue(Owner().mUpperBodyEnabled) = false;
+      Owner().PlayAnim("Jump");
+    }
 
-			return NoTransition();
-		}
-	};
+    virtual Transition GetTransition() {
+      if (Owner().IsAnimDone()) {
+        if (!Owner().mMove) {
+          return SiblingTransition<Stand>("Stand");
+        } else {
+          return SiblingTransition<Move>("Move");
+        }
+      }
+
+      return NoTransition();
+    }
+  };
 };
 
-struct HeroUpperBodyStates
-{
-	struct BaseState : StateWithOwner < Hero >
-	{
-	};
+struct HeroUpperBodyStates {
+  struct BaseState : StateWithOwner<Hero> {};
 
-	struct Disabled : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (Owner().mUpperBodyEnabled)
-				return SiblingTransition<Enabled>();
+  struct Disabled : BaseState {
+    virtual Transition GetTransition() {
+      if (Owner().mUpperBodyEnabled)
+        return SiblingTransition<Enabled>("Enabled");
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Enabled : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (!Owner().mUpperBodyEnabled)
-				return SiblingTransition<Disabled>();
+  struct Enabled : BaseState {
+    virtual Transition GetTransition() {
+      if (!Owner().mUpperBodyEnabled)
+        return SiblingTransition<Disabled>("Disabled");
 
-			return InnerEntryTransition<Idle>();
-		}
-	};
+      return InnerEntryTransition<Idle>("Idle");
+    }
+  };
 
-	struct Idle : BaseState
-	{
-		virtual void OnEnter()
-		{
-			Owner().PlayAnim("Idle");
-		}
+  struct Idle : BaseState {
+    virtual void OnEnter() { Owner().PlayAnim("Idle"); }
 
-		virtual Transition GetTransition()
-		{
-			if (Owner().mReload)
-			{
-				Owner().mReload = false;
-				return SiblingTransition<Reload>();
-			}
+    virtual Transition GetTransition() {
+      if (Owner().mReload) {
+        Owner().mReload = false;
+        return SiblingTransition<Reload>("Reload");
+      }
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Reload : BaseState
-	{
-		virtual Transition GetTransition()
-		{
-			if (IsInInnerState<Reload_Done>())
-				return SiblingTransition<Idle>();
+  struct Reload : BaseState {
+    virtual Transition GetTransition() {
+      if (IsInInnerState<Reload_Done>())
+        return SiblingTransition<Idle>("Idle");
 
-			return InnerEntryTransition<Reload_PlayAnim>();
-		}
-	};
+      return InnerEntryTransition<Reload_PlayAnim>("Reload_PlayAnim");
+    }
+  };
 
-	struct Reload_PlayAnim : BaseState
-	{
-		virtual void OnEnter()
-		{
-			Owner().PlayAnim("Reload");
-		}
+  struct Reload_PlayAnim : BaseState {
+    virtual void OnEnter() { Owner().PlayAnim("Reload"); }
 
-		virtual Transition GetTransition()
-		{
-			if (Owner().IsAnimDone())
-				return SiblingTransition<Reload_Done>();
+    virtual Transition GetTransition() {
+      if (Owner().IsAnimDone())
+        return SiblingTransition<Reload_Done>("Reload_Done");
 
-			return NoTransition();
-		}
-	};
+      return NoTransition();
+    }
+  };
 
-	struct Reload_Done : BaseState
-	{
-		virtual void OnEnter()
-		{
-			// Only once we're done the anim to we actually reload our weapon
-			Owner().ReloadWeapon();
-		}
-	};
+  struct Reload_Done : BaseState {
+    virtual void OnEnter() {
+      // Only once we're done the anim to we actually reload our weapon
+      Owner().ReloadWeapon();
+    }
+  };
 };
 
 Hero::Hero()
-	: mMove(false)
-	, mJump(false)
-	, mReload(false)
-	, mUpperBodyEnabled(false)
+    : mMove(false), mJump(false), mReload(false), mUpperBodyEnabled(false)
 
 {
-	mStateMachines[0].Initialize<HeroFullBodyStates::Alive>(this);
-	mStateMachines[0].SetDebugInfo("FullBody ", TraceLevel::Basic);
+  mStateMachines[0].Initialize<HeroFullBodyStates::Alive>(this);
+  mStateMachines[0].SetDebugInfo("FullBody ", TraceLevel::Basic);
 
-	mStateMachines[1].Initialize<HeroUpperBodyStates::Disabled>(this);
-	mStateMachines[1].SetDebugInfo("UpperBody", TraceLevel::Basic);
+  mStateMachines[1].Initialize<HeroUpperBodyStates::Disabled>(this);
+  mStateMachines[1].SetDebugInfo("UpperBody", TraceLevel::Basic);
 }
 
-void Hero::Update()
-{
-	// Update state machines
-	for (int i = 0; i < 2; ++i)
-	{
-		mStateMachines[i].ProcessStateTransitions();
-		mStateMachines[i].UpdateStates();
-	}
+void Hero::Update() {
+  // Update state machines
+  for (int i = 0; i < 2; ++i) {
+    mStateMachines[i].ProcessStateTransitions();
+    mStateMachines[i].UpdateStates();
+  }
 
-	++mAnimFrame;
+  ++mAnimFrame;
 }
 
 ////////////////////// main //////////////////////
 
-int main()
-{
-	Hero hero;
-	
-	int whichUpdate = 0;
+int main() {
+  Hero hero;
 
-	printf(">>> Update %d\n", whichUpdate++);
-	hero.Update();
+  int whichUpdate = 0;
 
-	printf(">>> Input: Reload\n");
-	hero.mReload = true;
+  printf(">>> Update %d\n", whichUpdate++);
+  hero.Update();
 
-	printf(">>> Update %d\n", whichUpdate++);
-	hero.Update();
+  printf(">>> Input: Reload\n");
+  hero.mReload = true;
 
-	printf(">>> Input: Move\n");
-	hero.mMove = true;
+  printf(">>> Update %d\n", whichUpdate++);
+  hero.Update();
 
-	printf(">>> Update %d\n", whichUpdate++);
-	hero.Update();
+  printf(">>> Input: Move\n");
+  hero.mMove = true;
 
-	printf(">>> Update %d\n", whichUpdate++);
-	hero.Update();
+  printf(">>> Update %d\n", whichUpdate++);
+  hero.Update();
 
-	printf(">>> Input: Reload\n");
-	hero.mReload = true;
+  printf(">>> Update %d\n", whichUpdate++);
+  hero.Update();
 
-	printf(">>> Update %d\n", whichUpdate++);
-	hero.Update();
+  printf(">>> Input: Reload\n");
+  hero.mReload = true;
 
-	printf(">>> Input: Jump\n");
-	hero.mJump = true;
+  printf(">>> Update %d\n", whichUpdate++);
+  hero.Update();
 
-	printf(">>> Update %d\n", whichUpdate++);
-	hero.Update();
+  printf(">>> Input: Jump\n");
+  hero.mJump = true;
 
-	printf(">>> Update %d\n", whichUpdate++);
-	hero.Update();
+  printf(">>> Update %d\n", whichUpdate++);
+  hero.Update();
 
-	printf(">>> Update %d\n", whichUpdate++);
-	hero.Update();
+  printf(">>> Update %d\n", whichUpdate++);
+  hero.Update();
+
+  printf(">>> Update %d\n", whichUpdate++);
+  hero.Update();
 }
