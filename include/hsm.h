@@ -14,6 +14,8 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <set>
+#include <vector>
 
 #pragma once
 #ifndef __HSM_H__
@@ -58,8 +60,9 @@
 #include <map>     // for HSM_STD_MAP
 #include <vector>  // for HSM_STD_VECTOR
 
-// Define HSM_DEBUG to 0 or 1 explicitly, otherwise it will be 1 if _DEBUG is
-// defined
+
+// Define HSM_DEBUG to 0 or 1 explicitly, otherwise it will be 1 if _DEBUG is defined
+#define HSM_DEBUG 1
 #if !defined(HSM_DEBUG)
 #ifdef _DEBUG // MSVC defines this for Debug configurations
 #define HSM_DEBUG 1
@@ -68,10 +71,10 @@
 #endif
 #endif
 
-// If set and C++ RTTI is enabled, will use C++ RTTI instead of the custom HSM
-// RTTI system to identify state types and return state names. Using C++ RTTI
-// may yield better performance when comparing StateTypeIds, but the state names
-// returned are usually less human readable.
+// If set and C++ RTTI is enabled, will use C++ RTTI instead of the custom HSM RTTI system to
+// identify state types and return state names. Using C++ RTTI may yield better performance
+// when comparing StateTypeIds, but the state names returned are usually less human readable.
+#define HSM_USE_CPP_RTTI_IF_ENABLED 0
 #if !defined(HSM_USE_CPP_RTTI_IF_ENABLED)
 #define HSM_USE_CPP_RTTI_IF_ENABLED 1
 #endif
@@ -306,38 +309,38 @@ template <typename TargetState, typename... Args>
 OnEnterArgsFunc GenerateOnEnterArgsFunc(Args &&...args);
 }
 
-// Transition objects are created via the free-standing transition functions
-// below, and typically returned by GetTransition. They can also be stored as
-// data members, passed around, and returned later. They are meant to be
-// copyable and lightweight.
-struct Transition {
-  enum Type { Sibling, Inner, InnerEntry, No };
+// Transition objects are created via the free-standing transition functions below, and typically returned by
+// GetTransition. They can also be stored as data members, passed around, and returned later. They are meant
+// to be copyable and lightweight.
+struct Transition
+{
+	enum Type { Sibling, Inner, InnerEntry, No };
 
-  // Default is no transition
-  Transition()
-      : mTransitionType(Transition::No), mStateFactory(0), mLabel("") {}
+	// Default is no transition
+	Transition()
+	: mTransitionType(Transition::No)
+	, mStateFactory(0)
+	, mLabel("")
+	{
+	}
 
-  // Transition without state args
-  Transition(Transition::Type transitionType, const StateFactory &stateFactory,
-             std::string label)
-      : mTransitionType(transitionType), mStateFactory(&stateFactory),
-        mLabel(label) {}
+	// Transition without state args
+	Transition(Transition::Type transitionType, const StateFactory& stateFactory, std::string label)
+	: mTransitionType(transitionType)
+	, mStateFactory(&stateFactory)
+	, mLabel(label)
+	{
+	}
 
-  Transition::Type GetTransitionType() const { return mTransitionType; }
-  StateTypeId GetTargetStateType() const {
-    HSM_ASSERT(mStateFactory != 0);
-    return mStateFactory->GetStateType();
-  }
-  const StateFactory &GetStateFactory() const {
-    HSM_ASSERT(mStateFactory != 0);
-    return *mStateFactory;
-  }
-  std::string getLabel() { return mLabel; };
+	Transition::Type GetTransitionType() const { return mTransitionType; }
+	StateTypeId GetTargetStateType() const { HSM_ASSERT(mStateFactory != 0); return mStateFactory->GetStateType(); }
+	const StateFactory& GetStateFactory() const { HSM_ASSERT(mStateFactory != 0); return *mStateFactory; }
+	std::string getLabel()const {return mLabel;};
 
-  hsm_bool IsSibling() const { return mTransitionType == Sibling; }
-  hsm_bool IsInner() const { return mTransitionType == Inner; }
-  hsm_bool IsInnerEntry() const { return mTransitionType == InnerEntry; }
-  hsm_bool IsNo() const { return mTransitionType == No; }
+	hsm_bool IsSibling() const { return mTransitionType == Sibling; }
+	hsm_bool IsInner() const { return mTransitionType == Inner; }
+	hsm_bool IsInnerEntry() const { return mTransitionType == InnerEntry; }
+	hsm_bool IsNo() const { return mTransitionType == No; }
 
 private:
   Transition::Type mTransitionType;
@@ -460,125 +463,131 @@ void InitState(State *state, StateMachine *ownerStateMachine, size_t stackDepth,
                const StateFactory &stateFactory);
 }
 
-struct State {
-  State()
-      : mOwnerStateMachine(0), mStackDepth(0), mStateValueResetters(0),
-        mStateDebugName(0) {}
+struct State
+{
+	State()
+		: mOwnerStateMachine(0)
+		, mStackDepth(0)
+		, mStateValueResetters(0)
+		, mStateDebugName(0)
+	{
+	}
 
-  virtual ~State() { ResetStateValues(); }
+	virtual ~State()
+	{
+		ResetStateValues();
+	}
 
-  // RTTI interface
-  StateTypeId GetStateType() const { return mStateTypeId; }
-  const hsm_char *GetStateDebugName() const { return mStateDebugName; }
+	// RTTI interface
+	StateTypeId GetStateType() const { return mStateTypeId; }
+	virtual const hsm_char* GetStateDebugName()
+	{
+		return mStateDebugName;
+	}
 
-  // Accessors
-  StateMachine &GetStateMachine() {
-    HSM_ASSERT(mOwnerStateMachine != 0);
-    return *mOwnerStateMachine;
-  }
-  const StateMachine &GetStateMachine() const {
-    HSM_ASSERT(mOwnerStateMachine != 0);
-    return *mOwnerStateMachine;
-  }
+	// Accessors
+	StateMachine& GetStateMachine() { HSM_ASSERT(mOwnerStateMachine != 0); return *mOwnerStateMachine; }
+	const StateMachine& GetStateMachine() const { HSM_ASSERT(mOwnerStateMachine != 0); return *mOwnerStateMachine; }
+	
+	Owner*& GetOwner() { return mOwner; }
+	Owner*const& GetOwner() const { return mOwner; }
 
-  Owner *&GetOwner() { return mOwner; }
-  Owner *const &GetOwner() const { return mOwner; }
+	// Searches for state on stack from outermost to innermost, returns NULL if not found
+	template <typename StateType>
+	StateType* GetState();
 
-  // Searches for state on stack from outermost to innermost, returns NULL if
-  // not found
-  template <typename StateType> StateType *GetState();
+	template <typename StateType>
+	const StateType* GetState() const;
 
-  template <typename StateType> const StateType *GetState() const;
+	// Searches for state on stack starting from immediate outer to outermost, returns NULL if not found
+	template <typename StateType>
+	StateType* GetOuterState();
 
-  // Searches for state on stack starting from immediate outer to outermost,
-  // returns NULL if not found
-  template <typename StateType> StateType *GetOuterState();
+	template <typename StateType>
+	const StateType* GetOuterState() const;
 
-  template <typename StateType> const StateType *GetOuterState() const;
+	// Searches for state on stack starting from immediate inner to innermost, returns NULL if not found
+	template <typename StateType>
+	StateType* GetInnerState();
 
-  // Searches for state on stack starting from immediate inner to innermost,
-  // returns NULL if not found
-  template <typename StateType> StateType *GetInnerState();
+	template <typename StateType>
+	const StateType* GetInnerState() const;
 
-  template <typename StateType> const StateType *GetInnerState() const;
+	// Returns state on the stack immediately below us (our inner) if one exists
+	State* GetImmediateInnerState();
+	const State* GetImmediateInnerState() const;
 
-  // Returns state on the stack immediately below us (our inner) if one exists
-  State *GetImmediateInnerState();
-  const State *GetImmediateInnerState() const;
+	// Returns state on the stack immediately below us (our inner) if one exists AND is type StateType
+	template <typename StateType>
+	StateType* GetImmediateInnerState();
 
-  // Returns state on the stack immediately below us (our inner) if one exists
-  // AND is type StateType
-  template <typename StateType> StateType *GetImmediateInnerState();
+	template <typename StateType>
+	const StateType* GetImmediateInnerState() const;
 
-  template <typename StateType> const StateType *GetImmediateInnerState() const;
+	// Boolean query functions
 
-  // Boolean query functions
+	template <typename StateType>
+	hsm_bool IsInState() const;
 
-  template <typename StateType> hsm_bool IsInState() const;
+	template <typename StateType>
+	hsm_bool IsInOuterState() const { return GetOuterState<StateType>() != 0; }
 
-  template <typename StateType> hsm_bool IsInOuterState() const {
-    return GetOuterState<StateType>() != 0;
-  }
+	template <typename StateType>
+	hsm_bool IsInInnerState() const { return GetInnerState<StateType>() != 0; }
 
-  template <typename StateType> hsm_bool IsInInnerState() const {
-    return GetInnerState<StateType>() != 0;
-  }
+	template <typename StateType>
+	hsm_bool IsInImmediateInnerState() const { return GetImmediateInnerState<StateType>() != 0; }
 
-  template <typename StateType> hsm_bool IsInImmediateInnerState() const {
-    return GetImmediateInnerState<StateType>() != 0;
-  }
+	// Called from state functions (usually OnEnter()) to bind a StateValue to current state. Rather than
+	// passing in the new value, we return a writable reference to the StateValue's internal value to support
+	// modifying data members of structs/classes.
+	template <typename T>
+	T& SetStateValue(StateValue<T>& stateValue)
+	{
+		// Lazily add a resetter for this StateValue
+		if (!FindStateValueInResetterList(stateValue))
+		{
+			mStateValueResetters.push_back( HSM_NEW ConcreteStateValueResetter<T>(stateValue) );
+		}
 
-  // Called from state functions (usually OnEnter()) to bind a StateValue to
-  // current state. Rather than passing in the new value, we return a writable
-  // reference to the StateValue's internal value to support modifying data
-  // members of structs/classes.
-  template <typename T> T &SetStateValue(StateValue<T> &stateValue) {
-    // Lazily add a resetter for this StateValue
-    if (!FindStateValueInResetterList(stateValue)) {
-      mStateValueResetters.push_back(
-          HSM_NEW ConcreteStateValueResetter<T>(stateValue));
-    }
+		// Return its value so it can be modified
+		return stateValue.mValue;
+	}
 
-    // Return its value so it can be modified
-    return stateValue.mValue;
-  }
+	// Overridable functions
 
-  // Overridable functions
+	// OnEnter is invoked when a State is created; Note that GetStateMachine() is valid in OnEnter.
+	// Also note that the function does not need to be virtual as the state machine invokes it
+	// directly on the most-derived type (not polymorphically); however, we make it virtual to avoid
+	// compiler warnings about hiding base class functions.
+	virtual void OnEnter() {}
 
-  // OnEnter is invoked when a State is created; Note that GetStateMachine() is
-  // valid in OnEnter. Also note that the function does not need to be virtual
-  // as the state machine invokes it directly on the most-derived type (not
-  // polymorphically); however, we make it virtual to avoid compiler warnings
-  // about hiding base class functions.
-  virtual void OnEnter() {}
+	// You can also pass args to OnEnter via any of the transition functions. Just make sure to declare an 
+	// OnEnter that matches the argument types. Since the OnEnter call is delayed, the arguments will be copied.
+	// Use std::ref() to avoid the copy (but make sure the object is still valid by the time OnEnter is called!).
+	// 
+	//void OnEnter(...)
 
-  // You can also pass args to OnEnter via any of the transition functions. Just
-  // make sure to declare an OnEnter that matches the argument types. Since the
-  // OnEnter call is delayed, the arguments will be copied. Use std::ref() to
-  // avoid the copy (but make sure the object is still valid by the time OnEnter
-  // is called!).
-  //
-  // void OnEnter(...)
+	// OnExit is invoked just before a State is destroyed
+	virtual void OnExit() {}
 
-  // OnExit is invoked just before a State is destroyed
-  virtual void OnExit() {}
+	// Called by StateMachine::ProcessStateTransitions from outermost to innermost state, repeatedly until
+	// the state stack has settled (i.e. all states return NoTransition). Override this function to return
+	// a state to transition to, or NoTransition to remain in this state. Generally, this function should avoid
+	// side-effects (updating state) as it may be called several times on the same state per ProcessStateTransitions.
+	// Instead, it should read state to determine whether a transition should be made. Override Update instead
+	// to update the current state.
+	virtual Transition GetTransition()
+	{
+		return NoTransition();
+	}
 
-  // Called by StateMachine::ProcessStateTransitions from outermost to innermost
-  // state, repeatedly until the state stack has settled (i.e. all states return
-  // NoTransition). Override this function to return a state to transition to,
-  // or NoTransition to remain in this state. Generally, this function should
-  // avoid side-effects (updating state) as it may be called several times on
-  // the same state per ProcessStateTransitions. Instead, it should read state
-  // to determine whether a transition should be made. Override Update instead
-  // to update the current state.
-  virtual Transition GetTransition() { return NoTransition(); }
+	// Called by StateMachine::UpdateStates from outermost to innermost state. Usually invoked after the state
+	// stack has settled, and is where a state can do it's work.
+	virtual void Update(HSM_STATE_UPDATE_ARGS) {}
 
-  // Called by StateMachine::UpdateStates from outermost to innermost state.
-  // Usually invoked after the state stack has settled, and is where a state can
-  // do it's work.
-  virtual void Update(HSM_STATE_UPDATE_ARGS) {}
-
-  template <typename SourceState> StateOverride<SourceState> GetStateOverride();
+	template <typename SourceState>
+	StateOverride<SourceState> GetStateOverride();
 
 private:
   friend void detail::InitState(State *state, StateMachine *ownerStateMachine,
@@ -725,141 +734,174 @@ typedef HSM_STD_VECTOR<State *> StackType;
 typedef StackType::iterator OuterToInnerIterator;
 typedef StackType::reverse_iterator InnerToOuterIterator;
 
-namespace TraceLevel {
-enum Type { None = 0, Basic = 1, Diagnostic = 2 };
+namespace TraceLevel
+{
+	enum Type
+	{
+		None = 0,
+		Basic = 1,
+		Diagnostic = 2,
+		SequenceDiagram = 3
+	};
 };
 
 // The main interface to the hierarchical state machine; a single state machine
 // manages a stack of states.
-class StateMachine {
+
+//SequenceDiagram [frame=true framecolor=steelblue label="Sequence Diagram"] {
+//  actor user
+//  lifeline ":Web Browser" as web
+//  lifeline ":Application" as app autoactivate
+//  lifeline ":Auth server" as auth autoactivate
+//  entity "Content server" as content autoactivate
+//
+//  user --> web "get resource"
+//  activate web
+//  web --> app "request access"
+//  app -r-> web "Http redirect"
+//
+//  web --> auth "auth request"
+//  auth -r-> web "permission form"
+//  web -r-> user "permission form"
+//
+//  user --> web "user permission"
+//  web --> auth "process permission"
+//  auth -r-> web "Http redirect"
+//
+//  fragment alt "[Permission granted]" {
+//    web --> app "authorization code"
+//    app --> auth "authorization code"
+//    app <-r- auth "access token"
+//    app --> content "access protected resources"
+//    app <-r- content "protected resources"
+//    web <-r- app "protected resources"
+//    user <-r- web "protected resources"
+//  case "[no permission]"
+//    web --> app "no authorization"
+//    web <-r- app "resource not available"
+//    user <-r- web "resource not available"
+//  	deactivate web
+//  }
+//}
+
+class StateMachine
+{
 public:
-  StateMachine();
-  ~StateMachine();
+	StateMachine();
+	~StateMachine();
 
-  // Initializes the state machine
-  template <typename InitialStateType> void Initialize(Owner *owner = 0) {
-    HSM_ASSERT(mInitialTransition.IsNo());
-    mInitialTransition = SiblingTransition(GetStateFactory<InitialStateType>(),
-                                           std::string("Initialize"));
-    mOwner = owner;
-  }
+	// Initializes the state machine
+	template <typename InitialStateType>
+	void Initialize(Owner* owner = 0)
+	{
+		HSM_ASSERT(mInitialTransition.IsNo());
+		mInitialTransition = SiblingTransition(GetStateFactory<InitialStateType>(), std::string("Initialize"));
+		mOwner = owner;
+	}
 
-  //@NOTE: Removing this overload as it causes ambiguity when owner is not
-  //specified.
-  // Can make this work using SFINAE to enable this overload when StateArgsType
-  // derives from hsm::StateArgs. This would be simpler in C++11.
-  //
-  // Initializes the state machie with StateArgs for the initial state.
-  // template <typename InitialStateType, typename StateArgsType>
-  // void Initialize(const StateArgsType& initialStateArgs, Owner* owner = 0)
-  //{
-  //	HSM_ASSERT(mInitialTransition.IsNo());
-  //	mInitialTransition =
-  //SiblingTransition(GetStateFactory<InitialStateType>(), initialStateArgs);
-  //	mOwner = owner;
-  //}
+	//@NOTE: Removing this overload as it causes ambiguity when owner is not specified.
+	// Can make this work using SFINAE to enable this overload when StateArgsType derives
+	// from hsm::StateArgs. This would be simpler in C++11.
+	//
+	// Initializes the state machie with StateArgs for the initial state.
+	//template <typename InitialStateType, typename StateArgsType>
+	//void Initialize(const StateArgsType& initialStateArgs, Owner* owner = 0)
+	//{
+	//	HSM_ASSERT(mInitialTransition.IsNo());
+	//	mInitialTransition = SiblingTransition(GetStateFactory<InitialStateType>(), initialStateArgs);
+	//	mOwner = owner;
+	//}
 
-  // Shuts down the state machine, after which Initialize() must be called to
-  // use the state machine again. If stop is true, invokes Stop(). Destructor
-  // calls Shutdown(false).
-  void Shutdown(hsm_bool stop = hsm_true);
+	// Shuts down the state machine, after which Initialize() must be called to use the state machine again.
+	// If stop is true, invokes Stop(). Destructor calls Shutdown(false).
+	void Shutdown(hsm_bool stop = hsm_true);
 
-  // Returns true after Initialize and before Shutdown are invoked
-  hsm_bool IsInitialized() const { return !mInitialTransition.IsNo(); }
+	// Returns true after Initialize and before Shutdown are invoked
+	hsm_bool IsInitialized() const { return !mInitialTransition.IsNo(); }
 
-  // Pops all states off the state stack, including initial state, invoking
-  // OnExit on each one in inner-to-outer order. A subsequent call to
-  // ProcessStateTransitions will re-populate the state stack. After invoking
-  // Stop and before ProcessStateTransitions, IsStarted returns false.
-  void Stop();
+	// Pops all states off the state stack, including initial state, invoking OnExit on each one in inner-to-outer order.
+	// A subsequent call to ProcessStateTransitions will re-populate the state stack.
+	// After invoking Stop and before ProcessStateTransitions, IsStarted returns false.
+	void Stop();
 
-  // Started means the state stack is not empty
-  hsm_bool IsStarted() { return !mStateStack.empty(); }
+	// Started means the state stack is not empty
+	hsm_bool IsStarted() { return !mStateStack.empty(); }
 
-  // Debug tracing
-  void SetDebugInfo(const hsm_char *name, TraceLevel::Type traceLevel);
-  void SetDebugName(const hsm_char *name);
-  const hsm_char *GetDebugName() const { return mDebugName; }
-  void SetDebugTraceLevel(TraceLevel::Type trace) { mDebugTraceLevel = trace; }
-  TraceLevel::Type GetDebugTraceLevel() const { return mDebugTraceLevel; }
+	// Debug tracing
+	void SetDebugInfo(const hsm_char* name, TraceLevel::Type traceLevel);
+	void SetDebugName(const hsm_char* name);
+	const hsm_char* GetDebugName() const { return mDebugName; }
+	void SetDebugTraceLevel(TraceLevel::Type trace) { mDebugTraceLevel = trace; }
+	TraceLevel::Type GetDebugTraceLevel() const { return mDebugTraceLevel; }
 
-  // Call to update the state stack (usually once per frame). This function will
-  // iterate over the state stack, calling GetTransition() on each state, and
-  // will perform transitions until all states return NoTransition.
-  void ProcessStateTransitions();
+	// Call to update the state stack (usually once per frame). This function will iterate over the state stack,
+	// calling GetTransition() on each state, and will perform transitions until all states return NoTransition.
+	void ProcessStateTransitions();
 
-  // Call after ProcessStateTransitions (once the state stack has settled) to
-  // allow each state to perform its work. Will invoke Update() on each state,
-  // from outermost to innermost.
-  void UpdateStates(HSM_STATE_UPDATE_ARGS);
+	// Call after ProcessStateTransitions (once the state stack has settled) to allow each state to perform its
+	// work. Will invoke Update() on each state, from outermost to innermost.
+	void UpdateStates(HSM_STATE_UPDATE_ARGS);
 
-  // Owner accessors (may return NULL)
-  Owner *GetOwner() { return mOwner; }
-  const Owner *GetOwner() const { return mOwner; }
+	// Owner accessors (may return NULL)
+	Owner* GetOwner() { return mOwner; }
+	const Owner* GetOwner() const { return mOwner; }
 
-  // State stack iterators
-  OuterToInnerIterator BeginOuterToInner() { return mStateStack.begin(); }
-  OuterToInnerIterator EndOuterToInner() { return mStateStack.end(); }
-  InnerToOuterIterator BeginInnerToOuter() { return mStateStack.rbegin(); }
-  InnerToOuterIterator EndInnerToOuter() { return mStateStack.rend(); }
+	// State stack iterators
+	OuterToInnerIterator BeginOuterToInner() { return mStateStack.begin(); }
+	OuterToInnerIterator EndOuterToInner() { return mStateStack.end(); }
+	InnerToOuterIterator BeginInnerToOuter() { return mStateStack.rbegin(); }
+	InnerToOuterIterator EndInnerToOuter() { return mStateStack.rend(); }
 
-  // State stack query functions
+	std::set<const hsm_char*> SequenceDiagramStatesSeen;
 
-  // Returns NULL if state is not found on the stack
-  State *GetState(StateTypeId stateType);
-  const State *GetState(StateTypeId stateType) const {
-    return const_cast<const State *>(
-        const_cast<StateMachine *>(this)->GetState(stateType));
-  }
+	// State stack query functions
 
-  hsm_bool IsInState(StateTypeId stateType) const {
-    return GetState(stateType) != 0;
-  }
+	// Returns NULL if state is not found on the stack
+	State* GetState(StateTypeId stateType);
+	const State* GetState(StateTypeId stateType) const { return const_cast<const State*>( const_cast<StateMachine*>(this)->GetState(stateType) ); }
 
-  template <typename StateType> StateType *GetState() {
-    return static_cast<StateType *>(GetState(hsm::GetStateType<StateType>()));
-  }
+	hsm_bool IsInState(StateTypeId stateType) const { return GetState(stateType) != 0; }
 
-  template <typename StateType> hsm_bool IsInState() const {
-    return IsInState(hsm::GetStateType<StateType>());
-  }
+	template <typename StateType>
+	StateType* GetState() { return static_cast<StateType*>(GetState(hsm::GetStateType<StateType>())); }
 
-  // State override functions
+	template <typename StateType>
+	hsm_bool IsInState() const { return IsInState(hsm::GetStateType<StateType>()); }
 
-  template <typename SourceState, typename TargetState> void AddStateOverride();
+	// State override functions
 
-  template <typename SourceState> void RemoveStateOverride();
+	template <typename SourceState, typename TargetState>
+	void AddStateOverride();
 
-  template <typename SourceState> const StateFactory &GetStateOverride();
+	template <typename SourceState>
+	void RemoveStateOverride();
 
-  template <typename InitialStateType>
-  HSM_DEPRECATED("Initialize should no longer accept debug info. Use "
-                 "SetDebugInfo instead.")
-  void Initialize(Owner *owner, const hsm_char *debugName, size_t debugLevel) {
-    HSM_ASSERT(mInitialTransition.IsNo());
-    mInitialTransition = SiblingTransition(GetStateFactory<InitialStateType>());
-    mOwner = owner;
-    SetDebugInfo(debugName, debugLevel);
-  }
+	template <typename SourceState>
+	const StateFactory& GetStateOverride();
 
-  HSM_DEPRECATED("Use SetDebugInfo(const hsm_char*, TraceLevel::Type)")
-  void SetDebugInfo(const hsm_char *name, size_t level) {
-    SetDebugName(name);
-    SetDebugTraceLevel(static_cast<TraceLevel::Type>(level));
-  }
+	template <typename InitialStateType>
+	HSM_DEPRECATED("Initialize should no longer accept debug info. Use SetDebugInfo instead.")
+	void Initialize(Owner* owner, const hsm_char* debugName, size_t debugLevel)
+	{
+		HSM_ASSERT(mInitialTransition.IsNo());
+		mInitialTransition = SiblingTransition(GetStateFactory<InitialStateType>());
+		mOwner = owner;
+		SetDebugInfo(debugName, debugLevel);
+	}
 
-  HSM_DEPRECATED("Use SetDebugTraceLevel")
-  void SetDebugLevel(size_t level) {
-    SetDebugTraceLevel(static_cast<TraceLevel::Type>(level));
-  }
+	HSM_DEPRECATED("Use SetDebugInfo(const hsm_char*, TraceLevel::Type)")
+	void SetDebugInfo(const hsm_char* name, size_t level) { SetDebugName(name); SetDebugTraceLevel(static_cast<TraceLevel::Type>(level)); }
 
-  HSM_DEPRECATED("Use GetDebugLevel")
-  size_t GetDebugLevel() { return static_cast<size_t>(GetDebugTraceLevel()); }
+	HSM_DEPRECATED("Use SetDebugTraceLevel")
+	void SetDebugLevel(size_t level) { SetDebugTraceLevel(static_cast<TraceLevel::Type>(level)); }
+
+	HSM_DEPRECATED("Use GetDebugLevel")
+	size_t GetDebugLevel() { return static_cast<size_t>(GetDebugTraceLevel()); }
 
 private:
-  friend struct State;
-
-  void CreateAndPushInitialState(const Transition &transition);
+	friend struct State;
+	FILE *SequenceDiagramFile;
+	void CreateAndPushInitialState(const Transition& transition);
 
   // Returns state at input depth, or NULL if depth is invalid
   State *GetStateAtDepth(size_t depth);
@@ -872,8 +914,8 @@ private:
   State *GetInnerState(StateTypeId stateType, size_t startDepth);
   const State *GetInnerState(StateTypeId stateType, size_t startDepth) const;
 
-  // Pops states from most inner up to and including depth
-  void PopStatesToDepth(size_t depth, hsm_bool invokeOnExit = hsm_true);
+	// Pops states from most inner up to and including depth
+	std::vector<const hsm_char *> PopStatesToDepth(size_t depth, hsm_bool invokeOnExit = hsm_true);
 
   // Returns true if a transition was made, meaning we must keep processing
   hsm_bool ProcessStateTransitionsOnce();
@@ -881,9 +923,9 @@ private:
   void PushState(State *state);
   void PopState();
 
-  void Log(size_t minLevel, size_t numSpaces, const hsm_char *format, ...);
-  void LogTransition(size_t minLevel, size_t depth, const hsm_char *transType,
-                     State *state);
+	void Log(size_t minLevel, size_t numSpaces, const hsm_char* format, ...);
+	void LogTransition(size_t minLevel, size_t depth, const hsm_char* transType, State* state);
+	void LogSequenceDiagramTransition(const hsm_char* source_state, const hsm_char* destination_state, std::string label);
 
   Owner *mOwner; // Provided by client, accessed within states via
                  // StateWithOwner<>::Owner()
@@ -981,8 +1023,9 @@ inline const StateFactory &StateMachine::GetStateOverride() {
 #define HSM_LOG(minLevel, numSpaces, printfArgs)
 #define HSM_LOG_TRANSITION(minLevel, depth, transTypeStr, state)
 #else
-#define HSM_LOG Log
-#define HSM_LOG_TRANSITION LogTransition
+	#define HSM_LOG Log
+	#define HSM_LOG_SD_TRANSITION LogSequenceDiagramTransition
+	#define HSM_LOG_TRANSITION LogTransition
 #endif
 
 namespace detail {
@@ -996,17 +1039,12 @@ inline void InitState(State *state, StateMachine *ownerStateMachine,
   state->mStateDebugName = stateFactory.GetStateName();
 }
 
-inline State *CreateState(const Transition &transition,
-                          StateMachine *ownerStateMachine, size_t stackDepth) {
-  State *state = transition.GetStateFactory().AllocateState();
-  InitState(state, ownerStateMachine, stackDepth, transition.GetStateFactory());
-  return state;
-}
-
-inline void DestroyState(State *state) { HSM_DELETE(state); }
-
-inline void InvokeStateOnEnter(const Transition &transition, State *state) {
-  state->OnEnter();
+inline StateMachine::StateMachine()
+	: mOwner(0)
+	, mDebugTraceLevel(TraceLevel::None)
+{
+	mDebugName[0] = '\0';
+	SequenceDiagramFile = nullptr;
 }
 
 inline void InvokeStateOnExit(State *state) { state->OnExit(); }
@@ -1026,8 +1064,9 @@ inline void StateMachine::Shutdown(hsm_bool stop) {
   // Free any allocated states
   PopStatesToDepth(0, hsm_false);
 
-  mOwner = 0;
-  mInitialTransition = NoTransition();
+	mOwner = 0;
+	mInitialTransition = NoTransition();
+	fprintf(SequenceDiagramFile, "\n}\n");
 }
 
 inline void StateMachine::Stop() {
@@ -1041,9 +1080,15 @@ inline void StateMachine::SetDebugInfo(const hsm_char *name,
   SetDebugTraceLevel(traceLevel);
 }
 
-inline void StateMachine::SetDebugName(const hsm_char *name) {
-  STRNCPY(mDebugName, name, HSM_DEBUG_NAME_MAXLEN);
-  mDebugName[HSM_DEBUG_NAME_MAXLEN - 1] = '\0';
+inline void StateMachine::SetDebugName(const hsm_char* name)
+{
+	STRNCPY(mDebugName, name, HSM_DEBUG_NAME_MAXLEN);
+	mDebugName[HSM_DEBUG_NAME_MAXLEN - 1] = '\0';
+	std::string SDName(name);
+	SDName += std::string(".dotuml");
+	SequenceDiagramFile = fopen(SDName.c_str(),"w");
+	fprintf(SequenceDiagramFile, "SequenceDiagram [frame=true framecolor=steelblue label=\"Sequence Diagram for %s\"] {\n", SDName.c_str());
+
 }
 
 inline void StateMachine::ProcessStateTransitions() {
@@ -1132,101 +1177,164 @@ inline const State *StateMachine::GetInnerState(StateTypeId stateType,
   return const_cast<StateMachine *>(this)->GetInnerState(stateType, startDepth);
 }
 
-inline void
-StateMachine::CreateAndPushInitialState(const Transition &transition) {
-  HSM_ASSERT(mStateStack.empty());
-  State *initialState = detail::CreateState(transition, this, 0);
-  HSM_LOG_TRANSITION(1, 0, HSM_TEXT("Init"), initialState);
-  PushState(initialState);
-  detail::InvokeStateOnEnter(transition, initialState);
+inline void StateMachine::CreateAndPushInitialState(const Transition& transition)
+{
+	HSM_ASSERT(mStateStack.empty());
+	State* initialState = detail::CreateState(transition, this, 0);
+	HSM_LOG_TRANSITION(1, 0, HSM_TEXT("Init"), initialState);
+	if(SequenceDiagramStatesSeen.find(initialState->GetStateDebugName())==SequenceDiagramStatesSeen.end())
+	{
+		HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("lifeline \"%s\" as %s\n"), initialState->GetStateDebugName(), initialState->GetStateDebugName());
+		SequenceDiagramStatesSeen.insert(initialState->GetStateDebugName());
+	}
+	HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("activate %s\n"), initialState->GetStateDebugName());
+	PushState(initialState);
+	detail::InvokeStateOnEnter(transition, initialState);
 }
 
-inline void StateMachine::PopStatesToDepth(size_t depth,
-                                           hsm_bool invokeOnExit) {
-  const size_t numStatesToPop = mStateStack.size() - depth;
-  size_t currDepth = mStateStack.size() - 1;
+inline std::vector<const hsm_char *> StateMachine::PopStatesToDepth(size_t depth, hsm_bool invokeOnExit)
+{
+	std::vector<const hsm_char *> popNames;
+	const size_t numStatesToPop = mStateStack.size() - depth;
+	size_t currDepth = mStateStack.size() - 1;
 
-  for (size_t i = 0; i < numStatesToPop; ++i, --currDepth) {
-    State *state = mStateStack.back();
-    HSM_ASSERT(state == mStateStack.at(currDepth));
+	for (size_t i = 0; i < numStatesToPop; ++i, --currDepth)
+	{
+		State* state = mStateStack.back();
+		HSM_ASSERT(state == mStateStack.at(currDepth));
 
-    if (invokeOnExit) {
-      HSM_LOG_TRANSITION(2, currDepth, HSM_TEXT("Pop"), state);
-      detail::InvokeStateOnExit(state);
-    }
-    PopState();
-    detail::DestroyState(state);
-  }
+		if (invokeOnExit)
+		{
+			HSM_LOG_TRANSITION(2, currDepth, HSM_TEXT("Pop"), state);
+			popNames.push_back(state->GetStateDebugName());
+			detail::InvokeStateOnExit(state);
+		}
+		PopState();
+		detail::DestroyState(state);
+	}
+	if(numStatesToPop>1)
+		HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("note over %s,%s \"Hierarchical State Destroyed\"\n"), popNames.front(), popNames.back());
+
+	return popNames;
 }
 
-inline hsm_bool StateMachine::ProcessStateTransitionsOnce() {
-  // Process transitions from outermost to innermost states; if a valid sibling
-  // transition is returned, we must pop inners up to and including the state
-  // that returned the transition, then push the new inner. If an inner
-  // transition is returned, we must pop inners up to but not including the
-  // state that returned the transition (if any), then push the new inner.
+inline hsm_bool StateMachine::ProcessStateTransitionsOnce()
+{
+	// Process transitions from outermost to innermost states; if a valid sibling transition
+	// is returned, we must pop inners up to and including the state that returned the transition,
+	// then push the new inner. If an inner transition is returned, we must pop inners up to but
+	// not including the state that returned the transition (if any), then push the new inner.
 
-  for (size_t depth = 0; depth < mStateStack.size(); ++depth) {
-    State *currState = GetStateAtDepth(depth);
-    const Transition &transition = currState->GetTransition();
+	for (size_t depth = 0; depth < mStateStack.size(); ++depth)
+	{
+		State* currState = GetStateAtDepth(depth);
+		const Transition& transition = currState->GetTransition();
 
-    switch (transition.GetTransitionType()) {
-    case Transition::No: {
-      // Move on to next inner
-      continue;
-    } break;
+		switch (transition.GetTransitionType())
+		{
+			case Transition::No:
+			{
+				// Move on to next inner
+				continue;
+			}
+			break;
 
-    case Transition::Inner: {
-      if (State *innerState = GetStateAtDepth(depth + 1)) {
-        if (transition.GetTargetStateType() == innerState->GetStateType()) {
-          // Inner is already target state so keep going to next inner
-          continue;
-        } else {
-          // Pop all states under us and push target
-          PopStatesToDepth(depth + 1);
+			case Transition::Inner:
+			{
+				if (State* innerState = GetStateAtDepth(depth + 1))
+				{
+					if ( transition.GetTargetStateType() == innerState->GetStateType() )
+					{
+						// Inner is already target state so keep going to next inner
+						continue;
+					}
+					else
+					{
+						// Pop all states under us and push target
+						std::vector<const hsm_char*> res = PopStatesToDepth(depth + 1);
 
-          State *targetState = detail::CreateState(transition, this, depth + 1);
-          HSM_LOG_TRANSITION(1, depth + 1, HSM_TEXT("Inner"), targetState);
-          PushState(targetState);
-          detail::InvokeStateOnEnter(transition, targetState);
-          return hsm_true;
-        }
-      } else {
-        // No state under us so just push target
-        State *targetState = detail::CreateState(transition, this, depth + 1);
-        HSM_LOG_TRANSITION(1, depth + 1, HSM_TEXT("Inner"), targetState);
-        PushState(targetState);
-        detail::InvokeStateOnEnter(transition, targetState);
-        return hsm_true;
-      }
-    } break;
+						State* targetState = detail::CreateState(transition, this, depth + 1);
+						HSM_LOG_TRANSITION(1, depth + 1, HSM_TEXT("Inner"), targetState);
+						if(SequenceDiagramStatesSeen.find(targetState->GetStateDebugName())==SequenceDiagramStatesSeen.end())
+						{
+							HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("lifeline \"%s\" as %s\n"), targetState->GetStateDebugName(), targetState->GetStateDebugName());
+							SequenceDiagramStatesSeen.insert(targetState->GetStateDebugName());
+						}
+						HSM_LOG_SD_TRANSITION(currState->GetStateDebugName(), targetState->GetStateDebugName(), transition.getLabel());
+						for(auto names:res)
+							HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("deactivate %s\n"), names);
+						HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("activate %s\n"), targetState->GetStateDebugName());
+						PushState(targetState);
+						detail::InvokeStateOnEnter(transition, targetState);
+						return hsm_true;
+					}
+				}
+				else
+				{
+					// No state under us so just push target
+					State* targetState = detail::CreateState(transition, this, depth + 1);
+					HSM_LOG_TRANSITION(1, depth + 1, HSM_TEXT("Inner"), targetState);
+					if(SequenceDiagramStatesSeen.find(targetState->GetStateDebugName())==SequenceDiagramStatesSeen.end())
+					{
+						HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("lifeline \"%s\" as %s\n"), targetState->GetStateDebugName(), targetState->GetStateDebugName());
+						SequenceDiagramStatesSeen.insert(targetState->GetStateDebugName());
+					}
+					HSM_LOG_SD_TRANSITION(currState->GetStateDebugName(), targetState->GetStateDebugName(), transition.getLabel());
+					HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("activate %s\n"), targetState->GetStateDebugName());
+					PushState(targetState);
+					detail::InvokeStateOnEnter(transition, targetState);
+					return hsm_true;
+				}
+			}
+			break;
 
-    case Transition::InnerEntry: {
-      // If current state has no inner (is currently the innermost), then push
-      // the entry state
-      if (!GetStateAtDepth(depth + 1)) {
-        State *targetState = detail::CreateState(transition, this, depth + 1);
-        HSM_LOG_TRANSITION(1, depth + 1, HSM_TEXT("Entry"), targetState);
-        PushState(targetState);
-        detail::InvokeStateOnEnter(transition, targetState);
-        return hsm_true;
-      }
-    } break;
+			case Transition::InnerEntry:
+			{
+				// If current state has no inner (is currently the innermost), then push the entry state
+				if ( !GetStateAtDepth(depth + 1) )
+				{
+					State* targetState = detail::CreateState(transition, this, depth + 1);
+					HSM_LOG_TRANSITION(1, depth + 1, HSM_TEXT("Entry"), targetState);
+					if(SequenceDiagramStatesSeen.find(targetState->GetStateDebugName())==SequenceDiagramStatesSeen.end())
+					{
+						HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("lifeline \"%s\" as %s\n"), targetState->GetStateDebugName(), targetState->GetStateDebugName());
+						SequenceDiagramStatesSeen.insert(targetState->GetStateDebugName());
+					}
+					HSM_LOG_SD_TRANSITION(currState->GetStateDebugName(), targetState->GetStateDebugName(), transition.getLabel());
+					HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("activate %s\n"), targetState->GetStateDebugName());
+					PushState(targetState);
+					detail::InvokeStateOnEnter(transition, targetState);
+					return hsm_true;
+				}
+			}
+			break;
 
-    case Transition::Sibling: {
-      PopStatesToDepth(depth);
+			case Transition::Sibling:
+			{
+				const hsm_char* oldState = GetStateAtDepth(depth)->GetStateDebugName();
+				std::vector<const hsm_char*> res = PopStatesToDepth(depth);
 
-      State *targetState = detail::CreateState(transition, this, depth);
-      HSM_LOG_TRANSITION(1, depth, HSM_TEXT("Sibling"), targetState);
-      PushState(targetState);
-      detail::InvokeStateOnEnter(transition, targetState);
-      return hsm_true;
-    } break;
+				State* targetState = detail::CreateState(transition, this, depth);
+				HSM_LOG_TRANSITION(1, depth, HSM_TEXT("Sibling"), targetState);
+				if(SequenceDiagramStatesSeen.find(targetState->GetStateDebugName())==SequenceDiagramStatesSeen.end())
+					{
+						HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("lifeline \"%s\" as %s\n"), targetState->GetStateDebugName(), targetState->GetStateDebugName());
+						SequenceDiagramStatesSeen.insert(targetState->GetStateDebugName());
+					}
+				HSM_LOG_SD_TRANSITION(oldState, targetState->GetStateDebugName(), transition.getLabel());
+				for(auto names:res)
+					HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("deactivate %s\n"), names);
+				HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("activate %s\n"), targetState->GetStateDebugName());
+				PushState(targetState);
+				detail::InvokeStateOnEnter(transition, targetState);
+				return hsm_true;
+			}
+			break;
 
-    } // end switch on transition type
-  } // end for each depth
+		} // end switch on transition type
+	} // end for each depth
 
-  return hsm_false;
+	return hsm_false;
 }
 
 inline void StateMachine::PushState(State *state) {
@@ -1247,10 +1355,43 @@ inline void StateMachine::Log(size_t minLevel, size_t numSpaces,
     va_start(args, format);
     VSNPRINTF(buffer + offset, sizeof(buffer) - offset - 1, format, args);
 
-    // Print to stdout
-    HSM_PRINTF(HSM_TEXT("%s"), buffer);
-    va_end(args);
-  }
+inline void StateMachine::Log(size_t minLevel, size_t numSpaces, const hsm_char* format, ...)
+{
+
+	if (static_cast<size_t>(mDebugTraceLevel) == TraceLevel::Type::SequenceDiagram && minLevel==TraceLevel::Type::SequenceDiagram)
+	{
+		static hsm_char buffer[4096];
+
+		va_list args;
+		va_start(args, format);
+		VSNPRINTF(buffer, sizeof(buffer), format, args);
+
+		// Print to stdout
+		fprintf(SequenceDiagramFile, HSM_TEXT("%s"), buffer);
+		fflush(SequenceDiagramFile);
+		va_end(args);
+	}
+	else
+	{
+		if (static_cast<size_t>(mDebugTraceLevel) >= minLevel)
+		{
+			static hsm_char buffer[4096];
+			int offset = SNPRINTF(buffer, sizeof(buffer), HSM_TEXT("HSM_%lu_%s:%*s "), static_cast<unsigned long>(minLevel), mDebugName, static_cast<int>(numSpaces), "");
+
+			va_list args;
+			va_start(args, format);
+			VSNPRINTF(buffer + offset, sizeof(buffer) - offset - 1, format, args);
+
+			// Print to stdout
+			HSM_PRINTF(HSM_TEXT("%s"), buffer);
+			va_end(args);
+		}
+	}
+}
+
+inline void StateMachine::LogSequenceDiagramTransition(const hsm_char* source_state, const hsm_char* destination_state, std::string label)
+{
+	Log(TraceLevel::Type::SequenceDiagram, 0, HSM_TEXT("%s --> %s \"%s\"\n"), source_state, destination_state, label.c_str());
 }
 
 inline void StateMachine::LogTransition(size_t minLevel, size_t depth,
