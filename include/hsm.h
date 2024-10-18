@@ -1121,7 +1121,9 @@ inline void StateMachine::Shutdown(hsm_bool stop)
 
 	mOwner = 0;
 	mInitialTransition = NoTransition();
-	fprintf(SequenceDiagramFile, "\n}\n");
+	if(mDebugTraceLevel==TraceLevel::Type::SequenceDiagram) {
+	  fprintf(SequenceDiagramFile, "\n}\n");
+	}
 }
 
 inline void StateMachine::Stop()
@@ -1132,18 +1134,20 @@ inline void StateMachine::Stop()
 
 inline void StateMachine::SetDebugInfo(const hsm_char* name, TraceLevel::Type traceLevel)
 {
-	SetDebugName(name);
 	SetDebugTraceLevel(traceLevel);
+	SetDebugName(name);
 }
 
 inline void StateMachine::SetDebugName(const hsm_char* name)
 {
 	STRNCPY(mDebugName, name, HSM_DEBUG_NAME_MAXLEN);
 	mDebugName[HSM_DEBUG_NAME_MAXLEN - 1] = '\0';
-	std::string SDName(name);
-	SDName += std::string(".dotuml");
-	SequenceDiagramFile = fopen(SDName.c_str(),"w");
-	fprintf(SequenceDiagramFile, "SequenceDiagram [frame=true framecolor=steelblue label=\"Sequence Diagram for %s\"] {\n", SDName.c_str());
+	if(mDebugTraceLevel==TraceLevel::Type::SequenceDiagram) {
+	  std::string SDName(name);
+	  SDName += std::string(".dotuml");
+	  SequenceDiagramFile = fopen(SDName.c_str(),"w");
+	  fprintf(SequenceDiagramFile, "SequenceDiagram [frame=true framecolor=steelblue label=\"Sequence Diagram for %s\"] {\n", SDName.c_str());
+	};
 
 }
 
