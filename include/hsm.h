@@ -13,6 +13,9 @@
 #include <cstdarg>
 #include <functional>
 #include <memory>
+#include <string>
+#include <set>
+#include <vector>
 
 #pragma once
 #ifndef __HSM_H__
@@ -56,6 +59,7 @@
 #include <cstring>  // for STRNCPY
 
 // Define HSM_DEBUG to 0 or 1 explicitly, otherwise it will be 1 if _DEBUG is defined
+#define HSM_DEBUG 1
 #if !defined(HSM_DEBUG)
 #ifdef _DEBUG // MSVC defines this for Debug configurations
 #define HSM_DEBUG 1
@@ -67,6 +71,7 @@
 // If set and C++ RTTI is enabled, will use C++ RTTI instead of the custom HSM RTTI system to
 // identify state types and return state names. Using C++ RTTI may yield better performance
 // when comparing StateTypeIds, but the state names returned are usually less human readable.
+#define HSM_USE_CPP_RTTI_IF_ENABLED 0
 #if !defined(HSM_USE_CPP_RTTI_IF_ENABLED)
 #define HSM_USE_CPP_RTTI_IF_ENABLED 1
 #endif
@@ -332,7 +337,7 @@ struct Transition
 	Transition::Type GetTransitionType() const { return mTransitionType; }
 	StateTypeId GetTargetStateType() const { HSM_ASSERT(mStateFactory != 0); return mStateFactory->GetStateType(); }
 	const StateFactory& GetStateFactory() const { HSM_ASSERT(mStateFactory != 0); return *mStateFactory; }
-	std::string getLabel(){return mLabel;};
+	std::string getLabel()const {return mLabel;};
 
 	hsm_bool IsSibling() const { return mTransitionType == Sibling; }
 	hsm_bool IsInner() const { return mTransitionType == Inner; }
@@ -492,7 +497,10 @@ struct State
 
 	// RTTI interface
 	StateTypeId GetStateType() const { return mStateTypeId; }
-	const hsm_char* GetStateDebugName() const { return mStateDebugName; }
+	virtual const hsm_char* GetStateDebugName()
+	{
+		return mStateDebugName;
+	}
 
 	// Accessors
 	StateMachine& GetStateMachine() { HSM_ASSERT(mOwnerStateMachine != 0); return *mOwnerStateMachine; }
@@ -753,12 +761,50 @@ namespace TraceLevel
 	{
 		None = 0,
 		Basic = 1,
-		Diagnostic = 2
+		Diagnostic = 2,
+		SequenceDiagram = 3
 	};
 };
 
 // The main interface to the hierarchical state machine; a single state machine
 // manages a stack of states.
+
+//SequenceDiagram [frame=true framecolor=steelblue label="Sequence Diagram"] {
+//  actor user
+//  lifeline ":Web Browser" as web
+//  lifeline ":Application" as app autoactivate
+//  lifeline ":Auth server" as auth autoactivate
+//  entity "Content server" as content autoactivate
+//
+//  user --> web "get resource"
+//  activate web
+//  web --> app "request access"
+//  app -r-> web "Http redirect"
+//
+//  web --> auth "auth request"
+//  auth -r-> web "permission form"
+//  web -r-> user "permission form"
+//
+//  user --> web "user permission"
+//  web --> auth "process permission"
+//  auth -r-> web "Http redirect"
+//
+//  fragment alt "[Permission granted]" {
+//    web --> app "authorization code"
+//    app --> auth "authorization code"
+//    app <-r- auth "access token"
+//    app --> content "access protected resources"
+//    app <-r- content "protected resources"
+//    web <-r- app "protected resources"
+//    user <-r- web "protected resources"
+//  case "[no permission]"
+//    web --> app "no authorization"
+//    web <-r- app "resource not available"
+//    user <-r- web "resource not available"
+//  	deactivate web
+//  }
+//}
+
 class StateMachine
 {
 public:
@@ -827,6 +873,8 @@ public:
 	InnerToOuterIterator BeginInnerToOuter() { return mStateStack.rbegin(); }
 	InnerToOuterIterator EndInnerToOuter() { return mStateStack.rend(); }
 
+	std::set<const hsm_char*> SequenceDiagramStatesSeen;
+
 	// State stack query functions
 
 	// Returns NULL if state is not found on the stack
@@ -873,7 +921,7 @@ public:
 
 private:
 	friend struct State;
-
+	FILE *SequenceDiagramFile;
 	void CreateAndPushInitialState(const Transition& transition);
 
 	// Returns state at input depth, or NULL if depth is invalid
@@ -888,7 +936,7 @@ private:
 	const State* GetInnerState(StateTypeId stateType, size_t startDepth) const;
 
 	// Pops states from most inner up to and including depth
-	void PopStatesToDepth(size_t depth, hsm_bool invokeOnExit = hsm_true);
+	std::vector<const hsm_char *> PopStatesToDepth(size_t depth, hsm_bool invokeOnExit = hsm_true);
 
 	// Returns true if a transition was made, meaning we must keep processing
 	hsm_bool ProcessStateTransitionsOnce();
@@ -898,6 +946,7 @@ private:
 
 	void Log(size_t minLevel, size_t numSpaces, const hsm_char* format, ...);
 	void LogTransition(size_t minLevel, size_t depth, const hsm_char* transType, State* state);
+	void LogSequenceDiagramTransition(const hsm_char* source_state, const hsm_char* destination_state, std::string label);
 
 	Owner* mOwner; // Provided by client, accessed within states via StateWithOwner<>::Owner()
 	Transition mInitialTransition;
@@ -1011,6 +1060,7 @@ inline const StateFactory& StateMachine::GetStateOverride()
 	#define HSM_LOG_TRANSITION(minLevel, depth, transTypeStr, state)
 #else
 	#define HSM_LOG Log
+	#define HSM_LOG_SD_TRANSITION LogSequenceDiagramTransition
 	#define HSM_LOG_TRANSITION LogTransition
 #endif
 
@@ -1054,6 +1104,7 @@ inline StateMachine::StateMachine()
 	, mDebugTraceLevel(TraceLevel::None)
 {
 	mDebugName[0] = '\0';
+	SequenceDiagramFile = nullptr;
 }
 
 inline StateMachine::~StateMachine()
@@ -1071,6 +1122,7 @@ inline void StateMachine::Shutdown(hsm_bool stop)
 
 	mOwner = 0;
 	mInitialTransition = NoTransition();
+	fprintf(SequenceDiagramFile, "\n}\n");
 }
 
 inline void StateMachine::Stop()
@@ -1089,6 +1141,11 @@ inline void StateMachine::SetDebugName(const hsm_char* name)
 {
 	STRNCPY(mDebugName, name, HSM_DEBUG_NAME_MAXLEN);
 	mDebugName[HSM_DEBUG_NAME_MAXLEN - 1] = '\0';
+	std::string SDName(name);
+	SDName += std::string(".dotuml");
+	SequenceDiagramFile = fopen(SDName.c_str(),"w");
+	fprintf(SequenceDiagramFile, "SequenceDiagram [frame=true framecolor=steelblue label=\"Sequence Diagram for %s\"] {\n", SDName.c_str());
+
 }
 
 inline void StateMachine::ProcessStateTransitions()
@@ -1192,12 +1249,19 @@ inline void StateMachine::CreateAndPushInitialState(const Transition& transition
 	HSM_ASSERT(mStateStack.empty());
 	State* initialState = detail::CreateState(transition, this, 0);
 	HSM_LOG_TRANSITION(1, 0, HSM_TEXT("Init"), initialState);
+	if(SequenceDiagramStatesSeen.find(initialState->GetStateDebugName())==SequenceDiagramStatesSeen.end())
+	{
+		HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("lifeline \"%s\" as %s\n"), initialState->GetStateDebugName(), initialState->GetStateDebugName());
+		SequenceDiagramStatesSeen.insert(initialState->GetStateDebugName());
+	}
+	HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("activate %s\n"), initialState->GetStateDebugName());
 	PushState(initialState);
 	detail::InvokeStateOnEnter(transition, initialState);
 }
 
-inline void StateMachine::PopStatesToDepth(size_t depth, hsm_bool invokeOnExit)
+inline std::vector<const hsm_char *> StateMachine::PopStatesToDepth(size_t depth, hsm_bool invokeOnExit)
 {
+	std::vector<const hsm_char *> popNames;
 	const size_t numStatesToPop = mStateStack.size() - depth;
 	size_t currDepth = mStateStack.size() - 1;
 
@@ -1209,11 +1273,16 @@ inline void StateMachine::PopStatesToDepth(size_t depth, hsm_bool invokeOnExit)
 		if (invokeOnExit)
 		{
 			HSM_LOG_TRANSITION(2, currDepth, HSM_TEXT("Pop"), state);
+			popNames.push_back(state->GetStateDebugName());
 			detail::InvokeStateOnExit(state);
 		}
 		PopState();
 		detail::DestroyState(state);
 	}
+	if(numStatesToPop>1)
+		HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("note over %s,%s \"Hierarchical State Destroyed\"\n"), popNames.front(), popNames.back());
+
+	return popNames;
 }
 
 inline hsm_bool StateMachine::ProcessStateTransitionsOnce()
@@ -1249,10 +1318,19 @@ inline hsm_bool StateMachine::ProcessStateTransitionsOnce()
 					else
 					{
 						// Pop all states under us and push target
-						PopStatesToDepth(depth + 1);
+						std::vector<const hsm_char*> res = PopStatesToDepth(depth + 1);
 
 						State* targetState = detail::CreateState(transition, this, depth + 1);
 						HSM_LOG_TRANSITION(1, depth + 1, HSM_TEXT("Inner"), targetState);
+						if(SequenceDiagramStatesSeen.find(targetState->GetStateDebugName())==SequenceDiagramStatesSeen.end())
+						{
+							HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("lifeline \"%s\" as %s\n"), targetState->GetStateDebugName(), targetState->GetStateDebugName());
+							SequenceDiagramStatesSeen.insert(targetState->GetStateDebugName());
+						}
+						HSM_LOG_SD_TRANSITION(currState->GetStateDebugName(), targetState->GetStateDebugName(), transition.getLabel());
+						for(auto names:res)
+							HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("deactivate %s\n"), names);
+						HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("activate %s\n"), targetState->GetStateDebugName());
 						PushState(targetState);
 						detail::InvokeStateOnEnter(transition, targetState);
 						return hsm_true;
@@ -1263,6 +1341,13 @@ inline hsm_bool StateMachine::ProcessStateTransitionsOnce()
 					// No state under us so just push target
 					State* targetState = detail::CreateState(transition, this, depth + 1);
 					HSM_LOG_TRANSITION(1, depth + 1, HSM_TEXT("Inner"), targetState);
+					if(SequenceDiagramStatesSeen.find(targetState->GetStateDebugName())==SequenceDiagramStatesSeen.end())
+					{
+						HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("lifeline \"%s\" as %s\n"), targetState->GetStateDebugName(), targetState->GetStateDebugName());
+						SequenceDiagramStatesSeen.insert(targetState->GetStateDebugName());
+					}
+					HSM_LOG_SD_TRANSITION(currState->GetStateDebugName(), targetState->GetStateDebugName(), transition.getLabel());
+					HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("activate %s\n"), targetState->GetStateDebugName());
 					PushState(targetState);
 					detail::InvokeStateOnEnter(transition, targetState);
 					return hsm_true;
@@ -1277,6 +1362,13 @@ inline hsm_bool StateMachine::ProcessStateTransitionsOnce()
 				{
 					State* targetState = detail::CreateState(transition, this, depth + 1);
 					HSM_LOG_TRANSITION(1, depth + 1, HSM_TEXT("Entry"), targetState);
+					if(SequenceDiagramStatesSeen.find(targetState->GetStateDebugName())==SequenceDiagramStatesSeen.end())
+					{
+						HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("lifeline \"%s\" as %s\n"), targetState->GetStateDebugName(), targetState->GetStateDebugName());
+						SequenceDiagramStatesSeen.insert(targetState->GetStateDebugName());
+					}
+					HSM_LOG_SD_TRANSITION(currState->GetStateDebugName(), targetState->GetStateDebugName(), transition.getLabel());
+					HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("activate %s\n"), targetState->GetStateDebugName());
 					PushState(targetState);
 					detail::InvokeStateOnEnter(transition, targetState);
 					return hsm_true;
@@ -1286,10 +1378,20 @@ inline hsm_bool StateMachine::ProcessStateTransitionsOnce()
 
 			case Transition::Sibling:
 			{
-				PopStatesToDepth(depth);
+				const hsm_char* oldState = GetStateAtDepth(depth)->GetStateDebugName();
+				std::vector<const hsm_char*> res = PopStatesToDepth(depth);
 
 				State* targetState = detail::CreateState(transition, this, depth);
 				HSM_LOG_TRANSITION(1, depth, HSM_TEXT("Sibling"), targetState);
+				if(SequenceDiagramStatesSeen.find(targetState->GetStateDebugName())==SequenceDiagramStatesSeen.end())
+					{
+						HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("lifeline \"%s\" as %s\n"), targetState->GetStateDebugName(), targetState->GetStateDebugName());
+						SequenceDiagramStatesSeen.insert(targetState->GetStateDebugName());
+					}
+				HSM_LOG_SD_TRANSITION(oldState, targetState->GetStateDebugName(), transition.getLabel());
+				for(auto names:res)
+					HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("deactivate %s\n"), names);
+				HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("activate %s\n"), targetState->GetStateDebugName());
 				PushState(targetState);
 				detail::InvokeStateOnEnter(transition, targetState);
 				return hsm_true;
@@ -1314,19 +1416,41 @@ inline void StateMachine::PopState()
 
 inline void StateMachine::Log(size_t minLevel, size_t numSpaces, const hsm_char* format, ...)
 {
-	if (static_cast<size_t>(mDebugTraceLevel) >= minLevel)
+
+	if (static_cast<size_t>(mDebugTraceLevel) == TraceLevel::Type::SequenceDiagram && minLevel==TraceLevel::Type::SequenceDiagram)
 	{
 		static hsm_char buffer[4096];
- 		int offset = SNPRINTF(buffer, sizeof(buffer), HSM_TEXT("HSM_%lu_%s:%*s "), static_cast<unsigned long>(minLevel), mDebugName, static_cast<int>(numSpaces), "");
 
 		va_list args;
 		va_start(args, format);
-		VSNPRINTF(buffer + offset, sizeof(buffer) - offset - 1, format, args);
+		VSNPRINTF(buffer, sizeof(buffer), format, args);
 
 		// Print to stdout
-		HSM_PRINTF(HSM_TEXT("%s"), buffer);
+		fprintf(SequenceDiagramFile, HSM_TEXT("%s"), buffer);
+		fflush(SequenceDiagramFile);
 		va_end(args);
 	}
+	else
+	{
+		if (static_cast<size_t>(mDebugTraceLevel) >= minLevel)
+		{
+			static hsm_char buffer[4096];
+			int offset = SNPRINTF(buffer, sizeof(buffer), HSM_TEXT("HSM_%lu_%s:%*s "), static_cast<unsigned long>(minLevel), mDebugName, static_cast<int>(numSpaces), "");
+
+			va_list args;
+			va_start(args, format);
+			VSNPRINTF(buffer + offset, sizeof(buffer) - offset - 1, format, args);
+
+			// Print to stdout
+			HSM_PRINTF(HSM_TEXT("%s"), buffer);
+			va_end(args);
+		}
+	}
+}
+
+inline void StateMachine::LogSequenceDiagramTransition(const hsm_char* source_state, const hsm_char* destination_state, std::string label)
+{
+	Log(TraceLevel::Type::SequenceDiagram, 0, HSM_TEXT("%s --> %s \"%s\"\n"), source_state, destination_state, label.c_str());
 }
 
 inline void StateMachine::LogTransition(size_t minLevel, size_t depth, const hsm_char* transType, State* state)
