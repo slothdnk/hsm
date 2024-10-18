@@ -1,1 +1,0 @@
-/usr/bin/c++  -std=c++14 -rdynamic CMakeFiles/ch4_state_overrides.dir/source/ch4/state_overrides.cpp.o -o ch4_state_overrides 

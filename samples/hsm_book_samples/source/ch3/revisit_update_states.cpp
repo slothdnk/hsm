@@ -42,7 +42,7 @@ struct MyStates {
 
 MyOwner::MyOwner() {
   mStateMachine.Initialize<MyStates::A>(this);
-  mStateMachine.SetDebugInfo("TestHsm", TraceLevel::Basic);
+  mStateMachine.SetDebugInfo("TestHsm", TraceLevel::SequenceDiagram);
 }
 
 void MyOwner::UpdateStateMachine() {

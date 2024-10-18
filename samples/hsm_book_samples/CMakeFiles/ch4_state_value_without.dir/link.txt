@@ -1,1 +1,0 @@
-/usr/bin/c++  -std=c++14 -rdynamic CMakeFiles/ch4_state_value_without.dir/source/ch4/state_value_without.cpp.o -o ch4_state_value_without 

@@ -1,1 +1,0 @@
-/usr/bin/c++  -std=c++14 -rdynamic CMakeFiles/ch2_simplest_state_machine.dir/source/ch2/simplest_state_machine.cpp.o -o ch2_simplest_state_machine 

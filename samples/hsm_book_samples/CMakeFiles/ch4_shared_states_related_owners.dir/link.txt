@@ -1,1 +1,0 @@
-/usr/bin/c++  -std=c++14 -rdynamic CMakeFiles/ch4_shared_states_related_owners.dir/source/ch4/shared_states_related_owners.cpp.o -o ch4_shared_states_related_owners 

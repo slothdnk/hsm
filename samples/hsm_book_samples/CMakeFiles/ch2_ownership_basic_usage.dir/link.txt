@@ -1,1 +1,0 @@
-/usr/bin/c++  -std=c++14 -rdynamic CMakeFiles/ch2_ownership_basic_usage.dir/source/ch2/ownership_basic_usage.cpp.o -o ch2_ownership_basic_usage 

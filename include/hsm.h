@@ -36,8 +36,7 @@
 
 // HSM_DEPRECATED macro
 #if defined(HSM_COMPILER_CLANG_OR_GCC)
-#define HSM_DEPRECATED(MESSAGE)                                                \
-  __attribute__((deprecated("DEPRECATED: " MESSAGE)))
+#define HSM_DEPRECATED(MESSAGE) __attribute__((deprecated("DEPRECATED: " MESSAGE)))
 #elif defined(HSM_COMPILER_MSC)
 #define HSM_DEPRECATED(MESSAGE) __declspec(deprecated("DEPRECATED: " MESSAGE))
 #else
@@ -52,14 +51,12 @@
 // Config
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Includes required for macros defined below. You can remove/replace them if
-// you modify the macros.
-#include <cassert> // for HSM_ASSERT
-#include <cstdio>  // for SNPRINTF
-#include <cstring> // for STRNCPY
-#include <map>     // for HSM_STD_MAP
-#include <vector>  // for HSM_STD_VECTOR
-
+// Includes required for macros defined below. You can remove/replace them if you modify the macros.
+#include <vector>   // for HSM_STD_VECTOR
+#include <map>      // for HSM_STD_MAP
+#include <cassert>  // for HSM_ASSERT
+#include <cstdio>   // for SNPRINTF
+#include <cstring>  // for STRNCPY
 
 // Define HSM_DEBUG to 0 or 1 explicitly, otherwise it will be 1 if _DEBUG is defined
 #define HSM_DEBUG 1
@@ -74,7 +71,6 @@
 // If set and C++ RTTI is enabled, will use C++ RTTI instead of the custom HSM RTTI system to
 // identify state types and return state names. Using C++ RTTI may yield better performance
 // when comparing StateTypeIds, but the state names returned are usually less human readable.
-#define HSM_USE_CPP_RTTI_IF_ENABLED 0
 #if !defined(HSM_USE_CPP_RTTI_IF_ENABLED)
 #define HSM_USE_CPP_RTTI_IF_ENABLED 1
 #endif
@@ -89,8 +85,8 @@
 
 #define HSM_STATE_UPDATE_ARGS void
 #define HSM_STATE_UPDATE_ARGS_FORWARD
-// #define HSM_STATE_UPDATE_ARGS float deltaTime
-// #define HSM_STATE_UPDATE_ARGS_FORWARD deltaTime
+//#define HSM_STATE_UPDATE_ARGS float deltaTime
+//#define HSM_STATE_UPDATE_ARGS_FORWARD deltaTime
 
 typedef bool hsm_bool;
 #define hsm_true true
@@ -115,18 +111,18 @@ typedef char hsm_char;
 
 #define VSNPRINTF ::vsnprintf
 
-// typedef wchar_t hsm_char;
-// #define HSM_TEXT(x) L##x
-// #define HSM_PRINTF ::wprintf
-// #define STRCMP ::wcscmp
-// #define SNPRINTF ::swprintf
-// #define STRNCPY ::wcsncpy
-// #define VSNPRINTF _vsnwprintf
+//typedef wchar_t hsm_char;
+//#define HSM_TEXT(x) L##x
+//#define HSM_PRINTF ::wprintf
+//#define STRCMP ::wcscmp
+//#define SNPRINTF ::swprintf
+//#define STRNCPY ::wcsncpy
+//#define VSNPRINTF _vsnwprintf
 
 namespace hsm {
 
-// By default, Owner is stored as a void* but it may be useful to override this
-// to a client-specific type (or interface).
+// By default, Owner is stored as a void* but it may be useful to override this to a client-specific
+// type (or interface).
 typedef void Owner;
 
 } // namespace hsm
@@ -143,9 +139,7 @@ typedef void Owner;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // HSM_USE_CPP_RTTI is set if the compiler has standard C++ RTTI support enabled
-#if HSM_USE_CPP_RTTI_IF_ENABLED &&                                             \
-    ((defined(HSM_COMPILER_MSC) && defined(_CPPRTTI)) ||                       \
-     (defined(HSM_COMPILER_CLANG_OR_GCC) && defined(__GXX_RTTI)))
+#if HSM_USE_CPP_RTTI_IF_ENABLED && ( (defined(HSM_COMPILER_MSC) && defined(_CPPRTTI)) || (defined(HSM_COMPILER_CLANG_OR_GCC) && defined(__GXX_RTTI)) )
 #define HSM_USE_CPP_RTTI
 #endif
 
@@ -157,76 +151,78 @@ namespace hsm {
 
 // We use standard C++ RTTI
 
-// We need a copyable wrapper around std::type_info since std::type_info is
-// non-copyable
-struct StateTypeId {
-  StateTypeId() : mTypeInfo(0) {}
-  StateTypeId(const std::type_info &typeInfo) : mTypeInfo(&typeInfo) {}
-  hsm_bool operator==(const StateTypeId &rhs) const {
-    HSM_ASSERT_MSG(mTypeInfo != 0, "mTypeInfo was not properly initialized");
-    return *mTypeInfo == *rhs.mTypeInfo;
-  }
-  const std::type_info *mTypeInfo;
+// We need a copyable wrapper around std::type_info since std::type_info is non-copyable
+struct StateTypeId
+{
+	StateTypeId() : mTypeInfo(0) {}
+	StateTypeId(const std::type_info& typeInfo) : mTypeInfo(&typeInfo) {}
+	hsm_bool operator==(const StateTypeId& rhs) const
+	{
+		HSM_ASSERT_MSG(mTypeInfo != 0, "mTypeInfo was not properly initialized");
+		return *mTypeInfo == *rhs.mTypeInfo;
+	}
+	const std::type_info* mTypeInfo;
 };
 
-template <typename StateType> const StateTypeId &GetStateType() {
-  static StateTypeId stateTypeId(typeid(StateType));
-  return stateTypeId;
+template <typename StateType>
+const StateTypeId& GetStateType()
+{
+	static StateTypeId stateTypeId(typeid(StateType));
+	return stateTypeId;
 }
 
-template <typename StateType> const char *GetStateName() {
-  return GetStateType<StateType>().mTypeInfo->name();
+template <typename StateType>
+const char* GetStateName()
+{
+	return GetStateType<StateType>().mTypeInfo->name();
 }
 
 } // namespace hsm
 
-// DEFINE_HSM_STATE is NOT necessary; however, we define it here to nothing to
-// make it easier to test switching between compiler RTTI enabled or disabled.
+// DEFINE_HSM_STATE is NOT necessary; however, we define it here to nothing to make it easier to
+// test switching between compiler RTTI enabled or disabled.
 #define DEFINE_HSM_STATE(__StateName__)
 
 #else // !HSM_USE_CPP_RTTI
 
 namespace hsm {
 
-// Standard C++ RTTI is not available, so we roll our own custom RTTI. All
-// states are required to use the DEFINE_HSM_STATE macro, which makes use of the
-// input name of the state as the unique identifier. String compares are used to
-// determine equality.
+// Standard C++ RTTI is not available, so we roll our own custom RTTI. All states are required to use the
+// DEFINE_HSM_STATE macro, which makes use of the input name of the state as the unique identifier. String
+// compares are used to determine equality.
 
-// We need a comparable wrapper around the type name. We can't just compare
-// const char* pointers because GetTypeName<T> may return two different strings
-// for the same T in different translation units.
-struct StateTypeId {
-  StateTypeId(const hsm_char *aStateName = 0) : mStateName(aStateName) {}
-  hsm_bool operator==(const StateTypeId &rhs) const {
-    HSM_ASSERT_MSG(mStateName != 0, "StateTypeId was not properly initialized");
-    return STRCMP(mStateName, rhs.mStateName) == 0;
-  }
-  const hsm_char *mStateName;
+// We need a comparable wrapper around the type name. We can't just compare const char* pointers
+// because GetTypeName<T> may return two different strings for the same T in different translation units.
+struct StateTypeId
+{
+	StateTypeId(const hsm_char* aStateName = 0) : mStateName(aStateName) {}
+	hsm_bool operator==(const StateTypeId& rhs) const
+	{
+		HSM_ASSERT_MSG(mStateName != 0, "StateTypeId was not properly initialized");
+		return STRCMP(mStateName, rhs.mStateName) == 0;
+	}
+	const hsm_char* mStateName;
 };
-
-template <typename StateType> StateTypeId GetStateType() {
-  return StateType::GetStaticStateType();
+	
+template <typename StateType>
+StateTypeId GetStateType()
+{
+	return StateType::GetStaticStateType();
 }
 
-template <typename StateType> const char *GetStateName() {
-  return GetStateType<StateType>().mStateName;
+template <typename StateType>
+const char* GetStateName()
+{
+	return GetStateType<StateType>().mStateName;
 }
 
 } // namespace hsm
 
 // Must use this macro in every State to add RTTI support.
-#define DEFINE_HSM_STATE(__StateName__)                                        \
-  static hsm::StateTypeId GetStaticStateType() {                               \
-    static hsm::StateTypeId sStateTypeId(HSM_TEXT(#__StateName__));            \
-    return sStateTypeId;                                                       \
-  }                                                                            \
-  virtual hsm::StateTypeId DoGetStateType() const {                            \
-    return GetStaticStateType();                                               \
-  }                                                                            \
-  virtual const hsm_char *DoGetStateDebugName() const {                        \
-    return HSM_TEXT(#__StateName__);                                           \
-  }
+#define DEFINE_HSM_STATE(__StateName__) \
+	static hsm::StateTypeId GetStaticStateType() { static hsm::StateTypeId sStateTypeId(HSM_TEXT(#__StateName__)); return sStateTypeId; } \
+	virtual hsm::StateTypeId DoGetStateType() const { return GetStaticStateType(); } \
+	virtual const hsm_char* DoGetStateDebugName() const { return HSM_TEXT(#__StateName__); }
 
 #endif // !HSM_USE_CPP_RTTI
 
@@ -246,67 +242,72 @@ namespace hsm {
 struct State;
 struct StateFactory;
 
-// Returns the one StateFactory instance for the input state. Note that this
-// type can be used to effectively store a state in a variable at runtime, which
-// can subsequently be passed to a Transition function.
-template <typename TargetState> const StateFactory &GetStateFactory();
+// Returns the one StateFactory instance for the input state. Note that this type can be used to effectively store
+// a state in a variable at runtime, which can subsequently be passed to a Transition function.
+template <typename TargetState>
+const StateFactory& GetStateFactory();
 
 // State creation interface
-struct StateFactory {
-  virtual StateTypeId GetStateType() const = 0;
-  virtual const char *GetStateName() const = 0;
-  virtual State *AllocateState() const = 0;
+struct StateFactory
+{
+	virtual StateTypeId GetStateType() const = 0;
+	virtual const char* GetStateName() const = 0;
+	virtual State* AllocateState() const = 0;
 };
 
-inline bool operator==(const StateFactory &lhs, const StateFactory &rhs) {
-  return lhs.GetStateType() == rhs.GetStateType();
-}
-inline bool operator!=(const StateFactory &lhs, const StateFactory &rhs) {
-  return !(lhs == rhs);
-}
+inline bool operator==(const StateFactory& lhs, const StateFactory& rhs) { return lhs.GetStateType() == rhs.GetStateType(); }
+inline bool operator!=(const StateFactory& lhs, const StateFactory& rhs) { return !(lhs == rhs); }
 
-// ConcreteStateFactory is the actual state creator; these are allocated
-// statically in the transition functions (below) and stored within Transition
-// instances.
-template <typename TargetState> struct ConcreteStateFactory : StateFactory {
-  virtual StateTypeId GetStateType() const {
-    return hsm::GetStateType<TargetState>();
-  }
+// ConcreteStateFactory is the actual state creator; these are allocated statically in the transition
+// functions (below) and stored within Transition instances.
+template <typename TargetState>
+struct ConcreteStateFactory : StateFactory
+{
+	virtual StateTypeId GetStateType() const
+	{
+		return hsm::GetStateType<TargetState>();
+	}
 
-  virtual const char *GetStateName() const {
-    return hsm::GetStateName<TargetState>();
-  }
+	virtual const char* GetStateName() const
+	{
+		return hsm::GetStateName<TargetState>();
+	}
 
-  virtual State *AllocateState() const { return HSM_NEW TargetState(); }
+	virtual State* AllocateState() const
+	{
+		return HSM_NEW TargetState();
+	}
 
 private:
-  // Only GetStateFactory can create this type
-  friend const StateFactory &GetStateFactory<TargetState>();
-  ConcreteStateFactory() {}
+	// Only GetStateFactory can create this type
+	friend const StateFactory& GetStateFactory<TargetState>();
+	ConcreteStateFactory() {}
 };
 
-template <typename TargetState> const StateFactory &GetStateFactory() {
-  static_assert(std::is_convertible<TargetState, State>::value,
-                "TargetState must derive from hsm::State");
-  static ConcreteStateFactory<TargetState> instance;
-  return instance;
+template <typename TargetState>
+const StateFactory& GetStateFactory()
+{
+	static_assert(std::is_convertible<TargetState, State>::value, "TargetState must derive from hsm::State");
+	static ConcreteStateFactory<TargetState> instance;
+	return instance;
 }
 
-// Small wrapper used to carry the SourceState along with the StateFactory for a
-// state override. This allows us to provide an overload of transition functions
-// that accept a state override with args.
-template <typename SourceState> struct StateOverride {
-  explicit StateOverride(const StateFactory &stateFactory)
-      : mStateFactory(stateFactory) {}
-  operator const StateFactory &() const { return mStateFactory; }
-  const StateFactory &mStateFactory;
+// Small wrapper used to carry the SourceState along with the StateFactory for a state override.
+// This allows us to provide an overload of transition functions that accept a state override with args.
+template <typename SourceState>
+struct StateOverride
+{
+	explicit StateOverride(const StateFactory& stateFactory) : mStateFactory(stateFactory) {}
+	operator const StateFactory& () const { return mStateFactory; }
+	const StateFactory& mStateFactory;
 };
 
-typedef std::function<void(State *)> OnEnterArgsFunc;
+typedef std::function<void (State*)> OnEnterArgsFunc;
 
-namespace detail {
-template <typename TargetState, typename... Args>
-OnEnterArgsFunc GenerateOnEnterArgsFunc(Args &&...args);
+namespace detail
+{
+	template <typename TargetState, typename... Args>
+	OnEnterArgsFunc GenerateOnEnterArgsFunc(Args&&... args);
 }
 
 // Transition objects are created via the free-standing transition functions below, and typically returned by
@@ -343,54 +344,59 @@ struct Transition
 	hsm_bool IsNo() const { return mTransitionType == No; }
 
 private:
-  Transition::Type mTransitionType;
-  const StateFactory
-      *mStateFactory; // Bald pointer is safe for shallow copying because
-                      // StateFactory instances are always statically allocated
-  std::string mLabel;
+	Transition::Type mTransitionType;
+	const StateFactory* mStateFactory; // Bald pointer is safe for shallow copying because StateFactory instances are always statically allocated
+	std::string mLabel;
 };
+
 
 // Transition generators - use these to return from State::GetTransition()
 
 // SiblingTransition
 
-inline Transition SiblingTransition(const StateFactory &stateFactory,
-                                    std::string label) {
-  return Transition(Transition::Sibling, stateFactory, label);
+inline Transition SiblingTransition(const StateFactory& stateFactory, std::string label)
+{
+	return Transition(Transition::Sibling, stateFactory, label);
 }
 
 template <typename TargetState>
-Transition SiblingTransition(std::string label) {
-  return Transition(Transition::Sibling, GetStateFactory<TargetState>(), label);
+Transition SiblingTransition(std::string label)
+{
+	return Transition(Transition::Sibling, GetStateFactory<TargetState>(), label);
 }
 
 // InnerTransition
 
-inline Transition InnerTransition(const StateFactory &stateFactory,
-                                  std::string label) {
-  return Transition(Transition::Inner, stateFactory, label);
+inline Transition InnerTransition(const StateFactory& stateFactory, std::string label)
+{
+	return Transition(Transition::Inner, stateFactory, label);
 }
 
-template <typename TargetState> Transition InnerTransition(std::string label) {
-  return Transition(Transition::Inner, GetStateFactory<TargetState>(), label);
+template <typename TargetState>
+Transition InnerTransition(std::string label)
+{
+	return Transition(Transition::Inner, GetStateFactory<TargetState>(), label);
 }
 
 // InnerEntryTransition
 
-inline Transition InnerEntryTransition(const StateFactory &stateFactory,
-                                       std::string label) {
-  return Transition(Transition::InnerEntry, stateFactory, label);
+inline Transition InnerEntryTransition(const StateFactory& stateFactory, std::string label)
+{
+	return Transition(Transition::InnerEntry, stateFactory, label);
 }
 
 template <typename TargetState>
-Transition InnerEntryTransition(std::string label) {
-  return Transition(Transition::InnerEntry, GetStateFactory<TargetState>(),
-                    label);
+Transition InnerEntryTransition(std::string label)
+{
+	return Transition(Transition::InnerEntry, GetStateFactory<TargetState>(), label);
 }
 
 // NoTransition
 
-inline Transition NoTransition() { return Transition(); }
+inline Transition NoTransition()
+{
+	return Transition();
+}
 
 } // namespace hsm
 
@@ -411,56 +417,66 @@ class StateMachine;
 
 // StateValue
 
-template <typename T> struct ConcreteStateValueResetter;
+template <typename T>
+struct ConcreteStateValueResetter;
 
-template <typename T> struct StateValue {
-  // Constructor - allows client to initialize StateValue; afterward,
-  // can only assign via State::SetStateValue().
-  // Note that T must be default constructable.
-  explicit StateValue(const T &initValue = T()) { mValue = initValue; }
+template <typename T>
+struct StateValue
+{
+	// Constructor - allows client to initialize StateValue; afterward,
+	// can only assign via State::SetStateValue().
+	// Note that T must be default constructable.
+	explicit StateValue(const T& initValue = T()) { mValue = initValue; }
 
-  // Sometimes value cannot be set only from constructor, so we provide this
-  // setter; however it should only be used to initialize the value before
-  // states manipulate it.
-  void SetInitialValue(const T &initValue) { mValue = initValue; }
+	// Sometimes value cannot be set only from constructor, so we provide this setter;
+	// however it should only be used to initialize the value before states manipulate it.
+	void SetInitialValue(const T& initValue) { mValue = initValue; }
 
-  // Implicit conversion operator to const T& (but not T&)
-  operator const T &() const { return mValue; }
+	// Implicit conversion operator to const T& (but not T&)
+	operator const T&() const { return mValue; }
 
-  // Explicitly returns value
-  const T &Value() const { return mValue; }
+	// Explicitly returns value
+	const T& Value() const { return mValue; }
 
 private:
-  // Disable copy
-  StateValue(const StateValue &rhs);
-  StateValue &operator=(StateValue &rhs);
+	// Disable copy
+	StateValue(const StateValue& rhs);
+	StateValue& operator=(StateValue& rhs);
 
-  friend struct ConcreteStateValueResetter<T>;
-  friend struct State;
-  T mValue;
+	friend struct ConcreteStateValueResetter<T>;
+	friend struct State;
+	T mValue;
 };
 
-struct StateValueResetter {
-  virtual ~StateValueResetter() {}
+struct StateValueResetter
+{
+	virtual ~StateValueResetter() {}
 };
 
-template <typename T> struct ConcreteStateValueResetter : StateValueResetter {
-  ConcreteStateValueResetter(StateValue<T> &stateValue) {
-    mStateValue = &stateValue;
-    mOrigValue = stateValue.mValue;
-  }
+template <typename T>
+struct ConcreteStateValueResetter : StateValueResetter
+{
+	ConcreteStateValueResetter(StateValue<T>& stateValue)
+	{
+		mStateValue = &stateValue;
+		mOrigValue = stateValue.mValue;
+	}
 
-  virtual ~ConcreteStateValueResetter() { mStateValue->mValue = mOrigValue; }
+	virtual ~ConcreteStateValueResetter()
+	{
+		mStateValue->mValue = mOrigValue;
+	}
 
-  StateValue<T> *mStateValue;
-  T mOrigValue;
+	StateValue<T>* mStateValue;
+	T mOrigValue;
 };
+
 
 // State
 
-namespace detail {
-void InitState(State *state, StateMachine *ownerStateMachine, size_t stackDepth,
-               const StateFactory &stateFactory);
+namespace detail
+{
+	void InitState(State* state, StateMachine* ownerStateMachine, size_t stackDepth, const StateFactory& stateFactory);
 }
 
 struct State
@@ -590,128 +606,132 @@ struct State
 	StateOverride<SourceState> GetStateOverride();
 
 private:
-  friend void detail::InitState(State *state, StateMachine *ownerStateMachine,
-                                size_t stackDepth,
-                                const StateFactory &stateFactory);
+	friend void detail::InitState(State* state, StateMachine* ownerStateMachine, size_t stackDepth, const StateFactory& stateFactory);
 
-  template <typename T>
-  StateValue<T> *FindStateValueInResetterList(StateValue<T> &stateValue) {
-    StateValueResetterList::iterator iter = mStateValueResetters.begin();
-    const StateValueResetterList::iterator &iterEnd =
-        mStateValueResetters.end();
-    for (; iter != iterEnd; ++iter) {
-      if (&stateValue ==
-          static_cast<ConcreteStateValueResetter<T> *>(*iter)->mStateValue) {
-        return &stateValue;
-      }
-    }
-    return 0;
-  }
+	template <typename T>
+	StateValue<T>* FindStateValueInResetterList(StateValue<T>& stateValue)
+	{
+		StateValueResetterList::iterator iter = mStateValueResetters.begin();
+		const StateValueResetterList::iterator& iterEnd = mStateValueResetters.end();
+		for ( ; iter != iterEnd; ++iter)
+		{
+			if (&stateValue == static_cast<ConcreteStateValueResetter<T>*>(*iter)->mStateValue)
+			{
+				return &stateValue;
+			}
+		}
+		return 0;
+	}
 
-  void ResetStateValues() {
-    // Destroy StateValues (will reset to old value)
-    StateValueResetterList::iterator iter = mStateValueResetters.begin();
-    const StateValueResetterList::iterator &iterEnd =
-        mStateValueResetters.end();
-    for (; iter != iterEnd; ++iter) {
-      HSM_DELETE(*iter);
-    }
-    mStateValueResetters.clear();
-  }
+	void ResetStateValues()
+	{
+		// Destroy StateValues (will reset to old value)
+		StateValueResetterList::iterator iter = mStateValueResetters.begin();
+		const StateValueResetterList::iterator& iterEnd = mStateValueResetters.end();
+		for ( ; iter != iterEnd; ++iter)
+		{
+			HSM_DELETE(*iter);
+		}
+		mStateValueResetters.clear();
+	}
 
-  typedef HSM_STD_VECTOR<StateValueResetter *> StateValueResetterList;
+	typedef HSM_STD_VECTOR<StateValueResetter*> StateValueResetterList;
 
-  StateMachine *mOwnerStateMachine;
-  Owner *mOwner;      // Cached for performance and easier debugging
-  size_t mStackDepth; // Depth of this state instance on the stack
-  StateValueResetterList mStateValueResetters;
+	StateMachine* mOwnerStateMachine;
+	Owner* mOwner; // Cached for performance and easier debugging
+	size_t mStackDepth; // Depth of this state instance on the stack
+	StateValueResetterList mStateValueResetters;
 
-  // Values cached to avoid virtual call, especially since the values are
-  // constant
-  StateTypeId mStateTypeId;
-  const hsm_char *mStateDebugName;
+	// Values cached to avoid virtual call, especially since the values are constant
+	StateTypeId mStateTypeId;
+	const hsm_char* mStateDebugName;
 };
 
-// MSVC 14 (VS 2015) doesn't handle generating lambdas that capture C-style
-// arrays ("const T(&)[n]") by value, emitting error "array initialization
-// requires a brace-enclosed initializer list". The most common case that this
-// affects are immediate strings, so we work around this issue by detecting this
-// case and forwarding them as "const char*", which is safe since immediate
-// strings have global lifetime.
+// MSVC 14 (VS 2015) doesn't handle generating lambdas that capture C-style arrays ("const T(&)[n]")
+// by value, emitting error "array initialization requires a brace-enclosed initializer list".
+// The most common case that this affects are immediate strings, so we work around this issue by
+// detecting this case and forwarding them as "const char*", which is safe since immediate strings
+// have global lifetime.
 #ifdef _MSC_VER
 #define DECAY_IMMEDIATE_STRINGS_WHEN_FORWARDING
 #endif
 
-namespace detail {
-// Generates a lambda that will invoke TargetState::OnEnter with matching args.
-// We get a compiler-time error if a matching OnEnter is not found.
-template <typename TargetState, typename... Args>
-OnEnterArgsFunc DoGenerateOnEnterArgsFunc(Args &&...args) {
-  static_assert(std::is_convertible<TargetState, State>::value,
-                "TargetState must derive from hsm::State");
+namespace detail
+{
+	// Generates a lambda that will invoke TargetState::OnEnter with matching args.
+	// We get a compiler-time error if a matching OnEnter is not found.
+	template <typename TargetState, typename... Args>
+	OnEnterArgsFunc DoGenerateOnEnterArgsFunc(Args&&... args)
+	{
+		static_assert(std::is_convertible<TargetState, State>::value, "TargetState must derive from hsm::State");
 
-  // Purposely capture args by copy rather than by reference in case args are
-  // created on the stack. Use std::ref() to wrap args that do not need to be
-  // copied.
-  return [args...](State *state) {
-    HSM_ASSERT_MSG(state->GetStateType() == GetStateType<TargetState>(),
-                   "Type of state to call OnEnter on doesn't match original "
-                   "target state returned by transition");
+		// Purposely capture args by copy rather than by reference in case args are
+		// created on the stack. Use std::ref() to wrap args that do not need to be copied.
+		return[args...](State* state)
+		{
+			HSM_ASSERT_MSG(state->GetStateType() == GetStateType<TargetState>(),
+				"Type of state to call OnEnter on doesn't match original target state returned by transition");
 
-    static_cast<TargetState *>(state)->OnEnter(std::move(args)...);
-  };
-}
+			static_cast<TargetState*>(state)->OnEnter(std::move(args)...);
+		};
+	}
 
-// Base case: do nothing
-template <typename T> T &&DecayIfImmediateString(T &&arg1) {
-  return std::forward<T>(arg1);
-}
+	// Base case: do nothing
+	template <typename T>
+	T&& DecayIfImmediateString(T&& arg1)
+	{
+		return std::forward<T>(arg1);
+	}
 
-// If immediate string, decay to const char*
-template <size_t _Nx>
-const char *DecayIfImmediateString(const char (&arr)[_Nx]) {
-  return static_cast<const char *>(arr);
-}
+	// If immediate string, decay to const char*
+	template <size_t _Nx>
+	const char* DecayIfImmediateString(const char(&arr)[_Nx])
+	{
+		return static_cast<const char*>(arr);
+	}
 
-template <typename TargetState, typename... Args>
-OnEnterArgsFunc GenerateOnEnterArgsFunc(Args &&...args) {
+	template <typename TargetState, typename... Args>
+	OnEnterArgsFunc GenerateOnEnterArgsFunc(Args&&... args)
+	{
 #ifdef DECAY_IMMEDIATE_STRINGS_WHEN_FORWARDING
-  return DoGenerateOnEnterArgsFunc<TargetState>(
-      DecayIfImmediateString(args)...);
+		return DoGenerateOnEnterArgsFunc<TargetState>(DecayIfImmediateString(args)...);
 #else
-  return DoGenerateOnEnterArgsFunc<TargetState>(std::forward<Args>(args)...);
+		return DoGenerateOnEnterArgsFunc<TargetState>(std::forward<Args>(args)...);
 #endif // DECAY_IMMEDIATE_STRINGS_WHEN_FORWARDING
-}
+	}
 } // namespace detail
+
+
 
 // StateWithOwner
 
-// Class that clients can use instead of deriving directly from State that
-// provides convenient typed access to the Owner. This class can also be chained
-// via the StateBaseType parameter, which is useful when inheriting state
-// machines.
+// Class that clients can use instead of deriving directly from State that provides convenient
+// typed access to the Owner. This class can also be chained via the StateBaseType parameter,
+// which is useful when inheriting state machines.
 
 template <typename OwnerType, typename StateBaseType = State>
-struct StateWithOwner : StateBaseType {
-  using State::GetOwner;
-  using State::GetStateMachine;
+struct StateWithOwner : StateBaseType
+{
+	using State::GetStateMachine;
+	using State::GetOwner;
 
-  StateWithOwner() : mOwner(reinterpret_cast<OwnerType *&>(GetOwner())) {}
+	StateWithOwner() : mOwner(reinterpret_cast<OwnerType*&>(GetOwner())) {}
 
-  const OwnerType &Owner() const {
-    HSM_ASSERT(mOwner);
-    return *mOwner;
-  }
+	const OwnerType& Owner() const
+	{
+		HSM_ASSERT(mOwner);
+		return *mOwner;
+	}
 
-  OwnerType &Owner() {
-    HSM_ASSERT(mOwner);
-    return *mOwner;
-  }
+	OwnerType& Owner()
+	{
+		HSM_ASSERT(mOwner);
+		return *mOwner;
+	}
 
 private:
-  // Hide base class member with one who's type is OwnerType*, rather than
-  // void*. Also helpful when debugging.
-  OwnerType *const &mOwner;
+	// Hide base class member with one who's type is OwnerType*, rather than void*. Also helpful when debugging.
+	OwnerType* const& mOwner;
 };
 
 } // namespace hsm
@@ -730,7 +750,7 @@ private:
 namespace hsm {
 
 // State stack types
-typedef HSM_STD_VECTOR<State *> StackType;
+typedef HSM_STD_VECTOR<State*> StackType;
 typedef StackType::iterator OuterToInnerIterator;
 typedef StackType::reverse_iterator InnerToOuterIterator;
 
@@ -903,140 +923,179 @@ private:
 	FILE *SequenceDiagramFile;
 	void CreateAndPushInitialState(const Transition& transition);
 
-  // Returns state at input depth, or NULL if depth is invalid
-  State *GetStateAtDepth(size_t depth);
+	// Returns state at input depth, or NULL if depth is invalid
+	State* GetStateAtDepth(size_t depth);
 
-  // Overload returns state at input depth if it matches input type
-  State *GetStateAtDepth(size_t depth, StateTypeId stateType);
+	// Overload returns state at input depth if it matches input type
+	State* GetStateAtDepth(size_t depth, StateTypeId stateType);
 
-  State *GetOuterState(StateTypeId stateType, size_t startDepth);
-  const State *GetOuterState(StateTypeId stateType, size_t startDepth) const;
-  State *GetInnerState(StateTypeId stateType, size_t startDepth);
-  const State *GetInnerState(StateTypeId stateType, size_t startDepth) const;
+	State* GetOuterState(StateTypeId stateType, size_t startDepth);
+	const State* GetOuterState(StateTypeId stateType, size_t startDepth) const;
+	State* GetInnerState(StateTypeId stateType, size_t startDepth);
+	const State* GetInnerState(StateTypeId stateType, size_t startDepth) const;
 
 	// Pops states from most inner up to and including depth
 	std::vector<const hsm_char *> PopStatesToDepth(size_t depth, hsm_bool invokeOnExit = hsm_true);
 
-  // Returns true if a transition was made, meaning we must keep processing
-  hsm_bool ProcessStateTransitionsOnce();
+	// Returns true if a transition was made, meaning we must keep processing
+	hsm_bool ProcessStateTransitionsOnce();
 
-  void PushState(State *state);
-  void PopState();
+	void PushState(State* state);
+	void PopState();
 
 	void Log(size_t minLevel, size_t numSpaces, const hsm_char* format, ...);
 	void LogTransition(size_t minLevel, size_t depth, const hsm_char* transType, State* state);
 	void LogSequenceDiagramTransition(const hsm_char* source_state, const hsm_char* destination_state, std::string label);
 
-  Owner *mOwner; // Provided by client, accessed within states via
-                 // StateWithOwner<>::Owner()
-  Transition mInitialTransition;
-  StackType mStateStack;
+	Owner* mOwner; // Provided by client, accessed within states via StateWithOwner<>::Owner()
+	Transition mInitialTransition;
+	StackType mStateStack;
 
-  typedef std::map<const StateFactory *, const StateFactory *> OverrideMap;
-  OverrideMap mStateOverrides;
+	typedef std::map<const StateFactory*, const StateFactory*> OverrideMap;
+	OverrideMap mStateOverrides;
 
-  hsm_char mDebugName[HSM_DEBUG_NAME_MAXLEN];
-  TraceLevel::Type mDebugTraceLevel;
+	hsm_char mDebugName[HSM_DEBUG_NAME_MAXLEN];
+	TraceLevel::Type mDebugTraceLevel;
 };
 
-// Inline State member function implementations - implemented here because they
-// depend StateMachine being defined
 
-template <typename StateType> StateType *State::GetState() {
-  return GetStateMachine().GetState<StateType>();
-}
+// Inline State member function implementations - implemented here because they depend StateMachine being defined
 
-template <typename StateType> const StateType *State::GetState() const {
-  return const_cast<State *>(this)->GetState<StateType>();
-}
-
-template <typename StateType> StateType *State::GetOuterState() {
-  return static_cast<StateType *>(GetStateMachine().GetOuterState(
-      hsm::GetStateType<StateType>(), mStackDepth - 1));
-}
-
-template <typename StateType> const StateType *State::GetOuterState() const {
-  return const_cast<State *>(this)->GetOuterState<StateType>();
-}
-
-template <typename StateType> StateType *State::GetInnerState() {
-  return static_cast<StateType *>(GetStateMachine().GetInnerState(
-      hsm::GetStateType<StateType>(), mStackDepth + 1));
-}
-
-template <typename StateType> const StateType *State::GetInnerState() const {
-  return const_cast<State *>(this)->GetInnerState<StateType>();
-}
-
-template <typename StateType> hsm_bool State::IsInState() const {
-  return GetStateMachine().IsInState<StateType>();
-}
-
-inline State *State::GetImmediateInnerState() {
-  return GetStateMachine().GetStateAtDepth(mStackDepth + 1);
-}
-
-inline const State *State::GetImmediateInnerState() const {
-  return const_cast<State *>(this)->GetImmediateInnerState();
+template <typename StateType>
+StateType* State::GetState()
+{
+	return GetStateMachine().GetState<StateType>();
 }
 
 template <typename StateType>
-inline StateType *State::GetImmediateInnerState() {
-  return static_cast<StateType *>(GetStateMachine().GetStateAtDepth(
-      mStackDepth + 1, hsm::GetStateType<StateType>()));
+const StateType* State::GetState() const
+{
+	return const_cast<State*>(this)->GetState<StateType>();
 }
 
 template <typename StateType>
-inline const StateType *State::GetImmediateInnerState() const {
-  return const_cast<State *>(this)->GetImmediateInnerState<StateType>();
+StateType* State::GetOuterState()
+{
+	return static_cast<StateType*>(GetStateMachine().GetOuterState(hsm::GetStateType<StateType>(), mStackDepth - 1));
+}
+
+template <typename StateType>
+const StateType* State::GetOuterState() const
+{
+	return const_cast<State*>(this)->GetOuterState<StateType>();
+}
+
+template <typename StateType>
+StateType* State::GetInnerState()
+{
+	return static_cast<StateType*>(GetStateMachine().GetInnerState(hsm::GetStateType<StateType>(), mStackDepth + 1));
+}
+
+template <typename StateType>
+const StateType* State::GetInnerState() const
+{
+	return const_cast<State*>(this)->GetInnerState<StateType>();
+}
+
+template <typename StateType>
+hsm_bool State::IsInState() const
+{
+	return GetStateMachine().IsInState<StateType>();
+}
+
+inline State* State::GetImmediateInnerState()
+{
+	return GetStateMachine().GetStateAtDepth(mStackDepth + 1);
+}
+
+inline const State* State::GetImmediateInnerState() const
+{
+	return const_cast<State*>(this)->GetImmediateInnerState();
+}
+
+template <typename StateType>
+inline StateType* State::GetImmediateInnerState()
+{
+	return static_cast<StateType*>(GetStateMachine().GetStateAtDepth(mStackDepth + 1, hsm::GetStateType<StateType>()));
+}
+
+template <typename StateType>
+inline const StateType* State::GetImmediateInnerState() const
+{
+	return const_cast<State*>(this)->GetImmediateInnerState<StateType>();
 }
 
 template <typename SourceState>
-inline StateOverride<SourceState> State::GetStateOverride() {
-  return StateOverride<SourceState>(
-      GetStateMachine().GetStateOverride<SourceState>());
+inline StateOverride<SourceState> State::GetStateOverride()
+{
+	return StateOverride<SourceState>(GetStateMachine().GetStateOverride<SourceState>());
 }
 
 // Inline StateMachine function implementations
 
 template <typename SourceState, typename TargetState>
-inline void StateMachine::AddStateOverride() {
-  mStateOverrides[&hsm::GetStateFactory<SourceState>()] =
-      &hsm::GetStateFactory<TargetState>();
+inline void StateMachine::AddStateOverride()
+{
+	mStateOverrides[&hsm::GetStateFactory<SourceState>()] = &hsm::GetStateFactory<TargetState>();
 }
 
 template <typename SourceState>
-inline void StateMachine::RemoveStateOverride() {
-  const hsm::StateFactory &sourceStateFactory =
-      hsm::GetStateFactory<SourceState>();
-  mStateOverrides.erase(mStateOverrides.find(&sourceStateFactory));
+inline void StateMachine::RemoveStateOverride()
+{
+	const hsm::StateFactory& sourceStateFactory = hsm::GetStateFactory<SourceState>();
+	mStateOverrides.erase(mStateOverrides.find(&sourceStateFactory));
 }
 
 template <typename SourceState>
-inline const StateFactory &StateMachine::GetStateOverride() {
-  const StateFactory &sourceStateFactory = GetStateFactory<SourceState>();
-  OverrideMap::iterator iter = mStateOverrides.find(&sourceStateFactory);
-  return iter == mStateOverrides.end() ? sourceStateFactory : *iter->second;
+inline const StateFactory& StateMachine::GetStateOverride()
+{
+	const StateFactory& sourceStateFactory = GetStateFactory<SourceState>();
+	OverrideMap::iterator iter = mStateOverrides.find(&sourceStateFactory);
+	return iter == mStateOverrides.end() ? sourceStateFactory : *iter->second;
 }
 
 #if !HSM_DEBUG
-#define HSM_LOG(minLevel, numSpaces, printfArgs)
-#define HSM_LOG_TRANSITION(minLevel, depth, transTypeStr, state)
+	#define HSM_LOG(minLevel, numSpaces, printfArgs)
+	#define HSM_LOG_TRANSITION(minLevel, depth, transTypeStr, state)
 #else
 	#define HSM_LOG Log
 	#define HSM_LOG_SD_TRANSITION LogSequenceDiagramTransition
 	#define HSM_LOG_TRANSITION LogTransition
 #endif
 
-namespace detail {
-inline void InitState(State *state, StateMachine *ownerStateMachine,
-                      size_t stackDepth, const StateFactory &stateFactory) {
-  HSM_ASSERT(ownerStateMachine != 0);
-  state->mOwnerStateMachine = ownerStateMachine;
-  state->mOwner = ownerStateMachine->GetOwner();
-  state->mStackDepth = stackDepth;
-  state->mStateTypeId = stateFactory.GetStateType();
-  state->mStateDebugName = stateFactory.GetStateName();
+namespace detail
+{
+	inline void InitState(State* state, StateMachine* ownerStateMachine, size_t stackDepth, const StateFactory& stateFactory)
+	{
+		HSM_ASSERT(ownerStateMachine != 0);
+		state->mOwnerStateMachine = ownerStateMachine;
+		state->mOwner = ownerStateMachine->GetOwner();
+		state->mStackDepth = stackDepth;
+		state->mStateTypeId = stateFactory.GetStateType();
+		state->mStateDebugName = stateFactory.GetStateName();
+	}
+
+	inline State* CreateState(const Transition& transition, StateMachine* ownerStateMachine, size_t stackDepth)
+	{
+		State* state = transition.GetStateFactory().AllocateState();
+		InitState(state, ownerStateMachine, stackDepth, transition.GetStateFactory());
+		return state;
+	}
+
+	inline void DestroyState(State* state)
+	{
+		HSM_DELETE(state);
+	}
+
+	inline void InvokeStateOnEnter(const Transition& transition, State* state)
+	{
+		state->OnEnter();
+	}
+
+	inline void InvokeStateOnExit(State* state)
+	{
+		state->OnExit();
+	}
 }
 
 inline StateMachine::StateMachine()
@@ -1047,37 +1106,34 @@ inline StateMachine::StateMachine()
 	SequenceDiagramFile = nullptr;
 }
 
-inline void InvokeStateOnExit(State *state) { state->OnExit(); }
-} // namespace detail
-
-inline StateMachine::StateMachine()
-    : mOwner(0), mDebugTraceLevel(TraceLevel::None) {
-  mDebugName[0] = '\0';
+inline StateMachine::~StateMachine()
+{
+	Shutdown(hsm_false);
 }
 
-inline StateMachine::~StateMachine() { Shutdown(hsm_false); }
+inline void StateMachine::Shutdown(hsm_bool stop)
+{
+	if (stop)
+		Stop();
 
-inline void StateMachine::Shutdown(hsm_bool stop) {
-  if (stop)
-    Stop();
-
-  // Free any allocated states
-  PopStatesToDepth(0, hsm_false);
+	// Free any allocated states
+	PopStatesToDepth(0, hsm_false);
 
 	mOwner = 0;
 	mInitialTransition = NoTransition();
 	fprintf(SequenceDiagramFile, "\n}\n");
 }
 
-inline void StateMachine::Stop() {
-  PopStatesToDepth(0);
-  HSM_ASSERT(mStateStack.empty());
+inline void StateMachine::Stop()
+{
+	PopStatesToDepth(0);
+	HSM_ASSERT(mStateStack.empty());
 }
 
-inline void StateMachine::SetDebugInfo(const hsm_char *name,
-                                       TraceLevel::Type traceLevel) {
-  SetDebugName(name);
-  SetDebugTraceLevel(traceLevel);
+inline void StateMachine::SetDebugInfo(const hsm_char* name, TraceLevel::Type traceLevel)
+{
+	SetDebugName(name);
+	SetDebugTraceLevel(traceLevel);
 }
 
 inline void StateMachine::SetDebugName(const hsm_char* name)
@@ -1091,90 +1147,100 @@ inline void StateMachine::SetDebugName(const hsm_char* name)
 
 }
 
-inline void StateMachine::ProcessStateTransitions() {
-  // If the state stack is empty, push the initial state
-  if (mStateStack.empty()) {
-    HSM_ASSERT_MSG(!mInitialTransition.IsNo(), "Must call Initialize()");
-    CreateAndPushInitialState(mInitialTransition);
-  }
+inline void StateMachine::ProcessStateTransitions()
+{
+	// If the state stack is empty, push the initial state
+	if (mStateStack.empty())
+	{
+		HSM_ASSERT_MSG(!mInitialTransition.IsNo(), "Must call Initialize()");
+		CreateAndPushInitialState(mInitialTransition);
+	}
 
-  // After we make a transition, we must process all transitions again until we
-  // get no transitions from all states on the stack.
-  hsm_bool keepProcessing = hsm_true;
-  int numTransitionsProcessed = 0;
-  while (keepProcessing) {
-    keepProcessing = ProcessStateTransitionsOnce();
+	// After we make a transition, we must process all transitions again until we get no transitions
+	// from all states on the stack.
+	hsm_bool keepProcessing = hsm_true;
+	int numTransitionsProcessed = 0;
+	while (keepProcessing)
+	{
+		keepProcessing = ProcessStateTransitionsOnce();
 
-    if (++numTransitionsProcessed >= 1000) {
-      HSM_ASSERT_MSG(
-          hsm_false,
-          "ProcessStateTransitions: detected infinite transition loop");
-    }
-  }
+		if (++numTransitionsProcessed >= 1000)
+		{
+			HSM_ASSERT_MSG(hsm_false, "ProcessStateTransitions: detected infinite transition loop");
+		}
+	}
 }
 
-inline void StateMachine::UpdateStates(HSM_STATE_UPDATE_ARGS) {
-  OuterToInnerIterator iter = BeginOuterToInner();
-  OuterToInnerIterator end = EndOuterToInner();
-  for (; iter != end; ++iter) {
-    (*iter)->Update(HSM_STATE_UPDATE_ARGS_FORWARD);
-  }
+inline void StateMachine::UpdateStates(HSM_STATE_UPDATE_ARGS)
+{
+	OuterToInnerIterator iter = BeginOuterToInner();
+	OuterToInnerIterator end = EndOuterToInner();
+	for ( ; iter != end; ++iter)
+	{
+		(*iter)->Update(HSM_STATE_UPDATE_ARGS_FORWARD);
+	}
 }
 
-inline State *StateMachine::GetState(StateTypeId stateType) {
-  for (size_t i = 0; i < mStateStack.size(); ++i) {
-    State *state = mStateStack[i];
-    if (state->GetStateType() == stateType)
-      return state;
-  }
-  return 0;
+inline State* StateMachine::GetState(StateTypeId stateType)
+{
+	for (size_t i = 0; i < mStateStack.size(); ++i)
+	{
+		State* state = mStateStack[i];
+		if (state->GetStateType() == stateType)
+			return state;
+	}
+	return 0;
 }
 
-inline State *StateMachine::GetStateAtDepth(size_t depth) {
-  if (depth >= mStateStack.size()) {
-    return 0;
-  }
+inline State* StateMachine::GetStateAtDepth(size_t depth)
+{
+	if (depth >= mStateStack.size())
+	{
+		return 0;
+	}
 
-  return mStateStack[depth];
+	return mStateStack[depth];
 }
 
-inline State *StateMachine::GetStateAtDepth(size_t depth,
-                                            StateTypeId stateType) {
-  State *state = GetStateAtDepth(depth);
-  return (state && state->GetStateType() == stateType) ? state : 0;
+inline State* StateMachine::GetStateAtDepth(size_t depth, StateTypeId stateType)
+{
+	State* state = GetStateAtDepth(depth);
+	return (state && state->GetStateType() == stateType) ? state : 0;
 }
 
-inline State *StateMachine::GetOuterState(StateTypeId stateType,
-                                          size_t startDepth) {
-  const size_t numStatesToCompare = startDepth + 1;
-  size_t currDepth = startDepth;
+inline State* StateMachine::GetOuterState(StateTypeId stateType, size_t startDepth)
+{
+	const size_t numStatesToCompare = startDepth + 1;
+	size_t currDepth = startDepth;
 
-  for (size_t i = 0; i < numStatesToCompare; ++i, --currDepth) {
-    State *state = mStateStack[currDepth];
-    if (state->GetStateType() == stateType)
-      return state;
-  }
-  return 0;
+	for (size_t i = 0; i < numStatesToCompare; ++i, --currDepth)
+	{
+		State* state = mStateStack[currDepth];
+		if (state->GetStateType() == stateType)
+			return state;
+	}
+	return 0;
 }
 
-inline const State *StateMachine::GetOuterState(StateTypeId stateType,
-                                                size_t startDepth) const {
-  return const_cast<StateMachine *>(this)->GetOuterState(stateType, startDepth);
+inline const State* StateMachine::GetOuterState(StateTypeId stateType, size_t startDepth) const
+{
+	return const_cast<StateMachine*>(this)->GetOuterState(stateType, startDepth);
 }
 
-inline State *StateMachine::GetInnerState(StateTypeId stateType,
-                                          size_t startDepth) {
-  for (size_t i = startDepth; i < mStateStack.size(); ++i) {
-    State *state = mStateStack[i];
-    if (state->GetStateType() == stateType)
-      return state;
-  }
-  return 0;
+inline State* StateMachine::GetInnerState(StateTypeId stateType, size_t startDepth)
+{
+	for (size_t i = startDepth; i < mStateStack.size(); ++i)
+	{
+		State* state = mStateStack[i];
+		if (state->GetStateType() == stateType)
+			return state;
+	}
+	return 0;
 }
 
-inline const State *StateMachine::GetInnerState(StateTypeId stateType,
-                                                size_t startDepth) const {
-  return const_cast<StateMachine *>(this)->GetInnerState(stateType, startDepth);
+inline const State* StateMachine::GetInnerState(StateTypeId stateType, size_t startDepth) const
+{
+	return const_cast<StateMachine*>(this)->GetInnerState(stateType, startDepth);
 }
 
 inline void StateMachine::CreateAndPushInitialState(const Transition& transition)
@@ -1212,7 +1278,7 @@ inline std::vector<const hsm_char *> StateMachine::PopStatesToDepth(size_t depth
 		PopState();
 		detail::DestroyState(state);
 	}
-	if(numStatesToPop>1)
+	if(numStatesToPop>1 && popNames.size()>0)
 		HSM_LOG(TraceLevel::SequenceDiagram, 0, HSM_TEXT("note over %s,%s \"Hierarchical State Destroyed\"\n"), popNames.front(), popNames.back());
 
 	return popNames;
@@ -1337,23 +1403,15 @@ inline hsm_bool StateMachine::ProcessStateTransitionsOnce()
 	return hsm_false;
 }
 
-inline void StateMachine::PushState(State *state) {
-  mStateStack.push_back(state);
+inline void StateMachine::PushState(State* state)
+{
+	mStateStack.push_back(state);
 }
 
-inline void StateMachine::PopState() { mStateStack.pop_back(); }
-
-inline void StateMachine::Log(size_t minLevel, size_t numSpaces,
-                              const hsm_char *format, ...) {
-  if (static_cast<size_t>(mDebugTraceLevel) >= minLevel) {
-    static hsm_char buffer[4096];
-    int offset = SNPRINTF(buffer, sizeof(buffer), HSM_TEXT("HSM_%lu_%s:%*s "),
-                          static_cast<unsigned long>(minLevel), mDebugName,
-                          static_cast<int>(numSpaces), "");
-
-    va_list args;
-    va_start(args, format);
-    VSNPRINTF(buffer + offset, sizeof(buffer) - offset - 1, format, args);
+inline void StateMachine::PopState()
+{
+	mStateStack.pop_back();
+}
 
 inline void StateMachine::Log(size_t minLevel, size_t numSpaces, const hsm_char* format, ...)
 {
@@ -1394,11 +1452,9 @@ inline void StateMachine::LogSequenceDiagramTransition(const hsm_char* source_st
 	Log(TraceLevel::Type::SequenceDiagram, 0, HSM_TEXT("%s --> %s \"%s\"\n"), source_state, destination_state, label.c_str());
 }
 
-inline void StateMachine::LogTransition(size_t minLevel, size_t depth,
-                                        const hsm_char *transType,
-                                        State *state) {
-  Log(minLevel, depth, HSM_TEXT("%-8s: %s\n"), transType,
-      state->GetStateDebugName());
+inline void StateMachine::LogTransition(size_t minLevel, size_t depth, const hsm_char* transType, State* state)
+{
+	Log(minLevel, depth, HSM_TEXT("%-8s: %s\n"), transType, state->GetStateDebugName());
 }
 
 #undef HSM_LOG

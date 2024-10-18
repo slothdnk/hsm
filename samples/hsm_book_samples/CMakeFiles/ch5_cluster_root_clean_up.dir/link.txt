@@ -1,1 +1,0 @@
-/usr/bin/c++  -std=c++14 -rdynamic CMakeFiles/ch5_cluster_root_clean_up.dir/source/ch5/cluster_root_clean_up.cpp.o -o ch5_cluster_root_clean_up 

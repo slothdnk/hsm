@@ -1,1 +1,0 @@
-/usr/bin/c++  -std=c++14 -rdynamic CMakeFiles/ch4_sharing_functions_across_states.dir/source/ch4/sharing_functions_across_states.cpp.o -o ch4_sharing_functions_across_states 

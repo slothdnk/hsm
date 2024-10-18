@@ -1,1 +1,0 @@
-/usr/bin/c++  -std=c++14 -rdynamic CMakeFiles/ch4_cluster_root_state_data_2.dir/source/ch4/cluster_root_state_data_2.cpp.o -o ch4_cluster_root_state_data_2 

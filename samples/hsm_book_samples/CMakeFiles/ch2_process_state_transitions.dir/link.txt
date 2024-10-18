@@ -1,1 +1,0 @@
-/usr/bin/c++  -std=c++14 -rdynamic CMakeFiles/ch2_process_state_transitions.dir/source/ch2/process_state_transitions.cpp.o -o ch2_process_state_transitions 

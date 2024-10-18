@@ -1,1 +1,0 @@
-/usr/bin/c++  -std=c++14 -rdynamic CMakeFiles/ch3_drawing_hsms.dir/source/ch3/drawing_hsms.cpp.o -o ch3_drawing_hsms 
